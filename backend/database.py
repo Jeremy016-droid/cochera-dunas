@@ -6,6 +6,8 @@ from contextlib import contextmanager
 
 DB_PATH = pathlib.Path(__file__).parent.parent / "db" / "cochera.db"
 
+__all__ = ["DB_PATH", "db_session", "get_con"]
+
 def get_con() -> sqlite3.Connection:
     con = sqlite3.connect(DB_PATH, check_same_thread=False)
     con.row_factory = sqlite3.Row

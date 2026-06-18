@@ -4,13 +4,18 @@ Ejecutar:  uvicorn backend.main:app --reload
 Docs:      http://127.0.0.1:8000/docs
 """
 import hashlib
+import pathlib
+import sys
+from contextlib import asynccontextmanager
 from datetime import date, datetime
 from typing import Optional, List
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
-from .database import db_session
+from .database import db_session, DB_PATH
 from .schemas import (
     TipoVehiculoOut,
     PropietarioIn, PropietarioOut,
@@ -21,15 +26,26 @@ from .schemas import (
     DashboardOut,
 )
 
+BASE_DIR = pathlib.Path(__file__).parent.parent
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if not DB_PATH.exists():
+        sys.path.insert(0, str(BASE_DIR))
+        from db.init_db import init as init_db
+        init_db()
+    yield
+
 app = FastAPI(
     title="Sistema de Cochera API",
     version="1.0.0",
     description="API local para gestión de estacionamiento y pagos.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # En prod: restringir al dominio del frontend
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -459,3 +475,14 @@ def reporte_semanal(
         "totalYape": total_yape,
         "granTotal": total_efectivo + total_yape,
     }
+
+
+# ══════════════════════════════════════════════════════════════
+#  FRONTEND — Sirve los archivos HTML
+# ══════════════════════════════════════════════════════════════
+
+@app.get("/")
+def root():
+    return RedirectResponse("/login.html")
+
+app.mount("/", StaticFiles(directory=str(BASE_DIR)), name="static")
