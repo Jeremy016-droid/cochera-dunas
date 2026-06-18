@@ -1,0 +1,21 @@
+# Entorno virtual
+venv/
+python-embed/
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Base de datos local (se regenera con init_db.py)
+db/cochera.db
+db/cochera.db-shm
+db/cochera.db-wal
+
+# Accesos directos Windows
+*.lnk
+*.vbs
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cochera — Reportes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --negro:    #0a0a0a; --carbon:   #141414; --plomo:    #1e1e1e;
+      --borde:    #2a2a2a; --texto:    #e8e8e0; --suave:    #888880;
+      --amarillo: #f0c040; --rojo:     #e05050; --verde:    #50c080;
+      --azul:     #5090e0; --naranja:  #e08030;
+    }
+    html, body { min-height: 100%; background: var(--negro); color: var(--texto); font-family: 'DM Mono', monospace; }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(var(--borde) 1px, transparent 1px), linear-gradient(90deg, var(--borde) 1px, transparent 1px);
+      background-size: 40px 40px; opacity: .2; pointer-events: none;
+    }
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,10,10,.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--borde);
+      padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 56px;
+    }
+    .nav-brand { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.1rem; }
+    .nav-brand span { color: var(--amarillo); }
+    .nav-links { display: flex; gap: .25rem; }
+    .nav-links a {
+      padding: .4rem .85rem; border-radius: 2px; font-size: .72rem;
+      letter-spacing: .08em; text-transform: uppercase; text-decoration: none;
+      color: var(--suave); transition: color .15s, background .15s;
+    }
+    .nav-links a:hover { color: var(--texto); background: var(--plomo); }
+    .nav-links a.activo { color: var(--amarillo); background: rgba(240,192,64,.1); }
+    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    .usuario-badge { font-size: .68rem; color: var(--suave); }
+    .usuario-badge strong { color: var(--texto); }
+    .btn-logout {
+      padding: .35rem .75rem; border: 1px solid var(--borde); border-radius: 2px;
+      background: none; color: var(--suave); font-family: 'DM Mono', monospace;
+      font-size: .68rem; letter-spacing: .08em; text-transform: uppercase;
+      cursor: pointer; transition: color .15s, border-color .15s;
+    }
+    .btn-logout:hover { color: var(--rojo); border-color: var(--rojo); }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+    .page-header {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--borde);
+      animation: fadeIn .4s ease both;
+    }
+    .page-title { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; }
+    .page-sub { margin-top: .4rem; font-size: .72rem; color: var(--suave); }
+
+    /* FILTROS */
+    .filtros-panel {
+      background: var(--carbon); border: 1px solid var(--borde); border-radius: 2px;
+      padding: 1.25rem 1.5rem; margin-bottom: 1.5rem;
+      display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap;
+      animation: slideUp .4s cubic-bezier(.16,1,.3,1) both;
+    }
+    .campo { display: flex; flex-direction: column; gap: .4rem; }
+    label { font-size: .6rem; letter-spacing: .15em; text-transform: uppercase; color: var(--suave); }
+    input[type="date"], select {
+      background: var(--plomo); border: 1px solid var(--borde); border-radius: 2px;
+      padding: .65rem 1rem; font-family: 'DM Mono', monospace; font-size: .85rem;
+      color: var(--texto); outline: none; transition: border-color .2s; appearance: none; cursor: pointer;
+    }
+    input[type="date"]:focus, select:focus { border-color: var(--amarillo); }
+    select option { background: var(--plomo); }
+
+    .tabs { display: flex; gap: .5rem; margin-right: auto; }
+    .tab-btn {
+      padding: .5rem 1.1rem; border: 1px solid var(--borde); border-radius: 2px;
+      background: none; font-family: 'DM Mono', monospace; font-size: .72rem;
+      letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+      color: var(--suave); transition: all .15s;
+    }
+    .tab-btn:hover { color: var(--texto); border-color: #444; }
+    .tab-btn.activo { color: var(--amarillo); border-color: var(--amarillo); background: rgba(240,192,64,.07); }
+
+    .btn {
+      padding: .7rem 1.25rem; border-radius: 2px; border: none;
+      font-family: 'Syne', sans-serif; font-size: .82rem; font-weight: 700;
+      letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+      transition: all .15s; display: inline-flex; align-items: center; gap: .5rem; white-space: nowrap;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primario { background: var(--amarillo); color: var(--negro); }
+    .btn-primario:hover { background: #f5ce5a; }
+    .btn-verde { background: rgba(80,192,128,.15); border: 1px solid rgba(80,192,128,.3); color: var(--verde); }
+    .btn-verde:hover { background: rgba(80,192,128,.25); }
+    .btn-azul { background: rgba(80,144,224,.15); border: 1px solid rgba(80,144,224,.3); color: var(--azul); }
+    .btn-azul:hover { background: rgba(80,144,224,.25); }
+
+    /* MÉTRICAS RÁPIDAS */
+    .metricas-reporte {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;
+      margin-bottom: 1.5rem;
+      animation: slideUp .4s cubic-bezier(.16,1,.3,1) .1s both;
+    }
+    @media (max-width: 800px) { .metricas-reporte { grid-template-columns: repeat(2,1fr); } }
+    .metrica {
+      background: var(--carbon); border: 1px solid var(--borde); border-radius: 2px;
+      padding: 1rem 1.25rem; position: relative; overflow: hidden;
+    }
+    .metrica::before { content: ''; position: absolute; top:0; left:0; right:0; height: 2px; }
+    .metrica.c-verde::before    { background: var(--verde); }
+    .metrica.c-amarillo::before { background: var(--amarillo); }
+    .metrica.c-azul::before     { background: var(--azul); }
+    .metrica.c-rojo::before     { background: var(--rojo); }
+    .metrica-label { font-size: .58rem; letter-spacing: .14em; text-transform: uppercase; color: var(--suave); margin-bottom: .5rem; }
+    .metrica-val { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 800; line-height: 1; }
+
+    /* PANEL */
+    .panel {
+      background: var(--carbon); border: 1px solid var(--borde); border-radius: 2px;
+      margin-bottom: 1.5rem;
+      animation: slideUp .4s cubic-bezier(.16,1,.3,1) .15s both;
+    }
+    .panel-header {
+      padding: 1rem 1.5rem; border-bottom: 1px solid var(--borde);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel-titulo { font-family: 'Syne', sans-serif; font-size: .85rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .panel-body { padding: 0; }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      padding: .6rem 1.25rem; text-align: left; font-size: .58rem;
+      letter-spacing: .14em; text-transform: uppercase; color: var(--suave);
+      border-bottom: 1px solid var(--borde); white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid rgba(42,42,42,.5); transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,.02); }
+    tbody td { padding: .75rem 1.25rem; font-size: .78rem; vertical-align: middle; }
+
+    .badge {
+      display: inline-block; padding: .18rem .55rem; border-radius: 2px;
+      font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; border: 1px solid;
+    }
+    .badge-efectivo { color: var(--verde);   border-color: rgba(80,192,128,.3); background: rgba(80,192,128,.07); }
+    .badge-yape     { color: var(--azul);    border-color: rgba(80,144,224,.3); background: rgba(80,144,224,.07); }
+    .badge-rojo     { color: var(--rojo);    border-color: rgba(224,80,80,.3);  background: rgba(224,80,80,.07); }
+    .badge-naranja  { color: var(--naranja); border-color: rgba(224,128,48,.3); background: rgba(224,128,48,.07); }
+
+    .placa { font-family: 'Syne', sans-serif; font-weight: 800; font-size: .85rem; }
+    .monto { font-family: 'Syne', sans-serif; font-weight: 700; }
+    .monto-verde  { color: var(--verde); }
+    .monto-rojo   { color: var(--rojo); }
+
+    /* SUBTOTALES */
+    .subtotales {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;
+      padding: 1.25rem 1.5rem; border-top: 1px solid var(--borde);
+      background: rgba(255,255,255,.015);
+    }
+    .sub-item-label { font-size: .58rem; letter-spacing: .14em; text-transform: uppercase; color: var(--suave); margin-bottom: .3rem; }
+    .sub-item-val { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 800; }
+
+    /* SEMANAL — BARRAS */
+    .barras-wrap { padding: 1.5rem; }
+    .barra-fila { display: flex; align-items: center; gap: 1rem; margin-bottom: .85rem; }
+    .barra-fila:last-child { margin-bottom: 0; }
+    .barra-dia { width: 80px; font-size: .68rem; color: var(--suave); flex-shrink: 0; text-align: right; }
+    .barra-track { flex: 1; height: 28px; background: var(--plomo); border-radius: 2px; overflow: hidden; display: flex; }
+    .barra-efectivo { background: var(--verde); height: 100%; transition: width .6s cubic-bezier(.16,1,.3,1); }
+    .barra-yape     { background: var(--azul);  height: 100%; transition: width .6s cubic-bezier(.16,1,.3,1) .1s; }
+    .barra-total { width: 80px; font-family: 'Syne', sans-serif; font-size: .82rem; font-weight: 700; flex-shrink: 0; }
+    .leyenda { display: flex; gap: 1.5rem; padding: 0 1.5rem 1.25rem; }
+    .leyenda-item { display: flex; align-items: center; gap: .5rem; font-size: .68rem; color: var(--suave); }
+    .leyenda-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+    .vacio { padding: 2.5rem; text-align: center; color: var(--suave); font-size: .8rem; }
+
+    /* exportar */
+    .export-bar {
+      display: flex; gap: .75rem; padding: 1rem 1.5rem; border-top: 1px solid var(--borde);
+      background: rgba(255,255,255,.01);
+    }
+
+    @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+
+    /* print */
+    @media print {
+      nav, .filtros-panel, .export-bar, .btn { display: none !important; }
+      body { background: white; color: black; }
+      .panel, .metrica { border: 1px solid #ccc; background: white; }
+      .panel-titulo, .metrica-val, .placa, .monto { color: black; }
+      .metrica-label, .panel-header, thead th, tbody td { color: #333; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">COCHERA <span>DUNAS.</span></div>
+  <div class="nav-links">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="ingreso.html">Ingreso</a>
+    <a href="pagos.html">Pagos</a>
+    <a href="deudas.html">Deudas</a>
+    <a href="reportes.html" class="activo">Reportes</a>
+  </div>
+  <div class="nav-right">
+    <span class="usuario-badge">Hola, <strong id="navNombre">—</strong></span>
+    <button class="btn-logout" onclick="cerrarSesion()">Salir</button>
+  </div>
+</nav>
+
+<main>
+  <div class="page-header">
+    <div>
+      <div class="page-title">Reportes</div>
+      <div class="page-sub">Pagos por turno · Balance semanal · Exportación PDF y Excel</div>
+    </div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="filtros-panel">
+    <div class="tabs">
+      <button class="tab-btn activo" id="tabTurno" onclick="setTab('turno')">Por turno</button>
+      <button class="tab-btn" id="tabSemanal" onclick="setTab('semanal')">Semanal</button>
+    </div>
+
+    <!-- filtros turno -->
+    <div id="filtrosTurno" style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end">
+      <div class="campo">
+        <label>Fecha</label>
+        <input type="date" id="fechaTurno">
+      </div>
+      <div class="campo">
+        <label>Turno</label>
+        <select id="selTurno">
+          <option value="DIA">Día</option>
+          <option value="NOCHE">Noche</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- filtros semanal -->
+    <div id="filtrosSemanal" style="display:none;gap:1rem;flex-wrap:wrap;align-items:flex-end">
+      <div class="campo">
+        <label>Desde</label>
+        <input type="date" id="fechaIni">
+      </div>
+      <div class="campo">
+        <label>Hasta</label>
+        <input type="date" id="fechaFin">
+      </div>
+    </div>
+
+    <button class="btn btn-primario" onclick="generar()">Generar</button>
+  </div>
+
+  <!-- MÉTRICAS -->
+  <div class="metricas-reporte" id="metricas" style="display:none">
+    <div class="metrica c-verde">
+      <div class="metrica-label">Total efectivo</div>
+      <div class="metrica-val" id="mEfectivo" style="color:var(--verde)">S/0.00</div>
+    </div>
+    <div class="metrica c-azul">
+      <div class="metrica-label">Total Yape</div>
+      <div class="metrica-val" id="mYape" style="color:var(--azul)">S/0.00</div>
+    </div>
+    <div class="metrica c-amarillo">
+      <div class="metrica-label">Gran total</div>
+      <div class="metrica-val" id="mTotal" style="color:var(--amarillo)">S/0.00</div>
+    </div>
+    <div class="metrica c-rojo">
+      <div class="metrica-label">Deuda activa</div>
+      <div class="metrica-val" id="mDeuda" style="color:var(--rojo)">S/0.00</div>
+    </div>
+  </div>
+
+  <!-- TABLA PAGOS del turno -->
+  <div class="panel" id="panelTurno" style="display:none">
+    <div class="panel-header">
+      <div class="panel-titulo" id="tituloTurno">Pagos del turno</div>
+    </div>
+    <div class="panel-body">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Placa</th>
+            <th>Tipo</th>
+            <th>Bloques</th>
+            <th>Monto</th>
+            <th>Método</th>
+            <th>Operador</th>
+            <th>Hora</th>
+          </tr>
+        </thead>
+        <tbody id="bodyTurno">
+          <tr><td colspan="8" class="vacio">Sin datos.</td></tr>
+        </tbody>
+      </table>
+      <div class="subtotales" id="subtotalesTurno" style="display:none">
+        <div>
+          <div class="sub-item-label">Efectivo</div>
+          <div class="sub-item-val" id="subEfectivo" style="color:var(--verde)">S/0.00</div>
+        </div>
+        <div>
+          <div class="sub-item-label">Yape</div>
+          <div class="sub-item-val" id="subYape" style="color:var(--azul)">S/0.00</div>
+        </div>
+        <div>
+          <div class="sub-item-label">Total</div>
+          <div class="sub-item-val" id="subTotal" style="color:var(--amarillo)">S/0.00</div>
+        </div>
+      </div>
+    </div>
+    <div class="export-bar">
+      <button class="btn btn-verde" onclick="exportarPDF()">⬇ PDF</button>
+      <button class="btn btn-azul" onclick="exportarExcel()">⬇ Excel</button>
+    </div>
+  </div>
+
+  <!-- TABLA DEUDAS activas -->
+  <div class="panel" id="panelDeudas" style="display:none">
+    <div class="panel-header">
+      <div class="panel-titulo">Deudas activas</div>
+    </div>
+    <div class="panel-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Placa</th>
+            <th>Tipo</th>
+            <th>Propietario</th>
+            <th>Bloques pend.</th>
+            <th>Deuda total</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="bodyDeudas">
+          <tr><td colspan="6" class="vacio">Sin deudas activas.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SEMANAL — BARRAS -->
+  <div class="panel" id="panelSemanal" style="display:none">
+    <div class="panel-header">
+      <div class="panel-titulo" id="tituloSemanal">Balance semanal</div>
+    </div>
+    <div class="leyenda">
+      <div class="leyenda-item"><div class="leyenda-dot" style="background:var(--verde)"></div>Efectivo</div>
+      <div class="leyenda-item"><div class="leyenda-dot" style="background:var(--azul)"></div>Yape</div>
+    </div>
+    <div class="barras-wrap" id="barrasWrap">
+      <div class="vacio">Sin datos.</div>
+    </div>
+    <div class="subtotales" id="subtotalesSemanal" style="display:none">
+      <div>
+        <div class="sub-item-label">Total efectivo</div>
+        <div class="sub-item-val" id="semEfectivo" style="color:var(--verde)">S/0.00</div>
+      </div>
+      <div>
+        <div class="sub-item-label">Total Yape</div>
+        <div class="sub-item-val" id="semYape" style="color:var(--azul)">S/0.00</div>
+      </div>
+      <div>
+        <div class="sub-item-label">Gran total</div>
+        <div class="sub-item-val" id="semTotal" style="color:var(--amarillo)">S/0.00</div>
+      </div>
+    </div>
+    <div class="export-bar">
+      <button class="btn btn-verde" onclick="exportarPDF()">⬇ PDF</button>
+      <button class="btn btn-azul" onclick="exportarExcel()">⬇ Excel</button>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  const API = 'http://127.0.0.1:8000';
+  let usuario = null;
+  let tabActual = 'turno';
+  let datosActuales = null;
+  let deudasActuales = [];
+
+  function init() {
+    const stored = localStorage.getItem('cochera_usuario');
+    if (!stored) { window.location.href = 'login.html'; return; }
+    usuario = JSON.parse(stored);
+    document.getElementById('navNombre').textContent = usuario.nombre;
+
+    // Fechas por defecto
+    const hoy = new Date().toISOString().split('T')[0];
+    document.getElementById('fechaTurno').value = hoy;
+    document.getElementById('fechaFin').value = hoy;
+
+    // Inicio de semana (lunes)
+    const d = new Date();
+    d.setDate(d.getDate() - d.getDay() + 1);
+    document.getElementById('fechaIni').value = d.toISOString().split('T')[0];
+
+    // Turno actual
+    const h = new Date().getHours();
+    document.getElementById('selTurno').value = (h >= 18 || h < 8) ? 'NOCHE' : 'DIA';
+
+    generar();
+  }
+
+  function setTab(t) {
+    tabActual = t;
+    document.getElementById('tabTurno').classList.toggle('activo', t === 'turno');
+    document.getElementById('tabSemanal').classList.toggle('activo', t === 'semanal');
+    document.getElementById('filtrosTurno').style.display = t === 'turno' ? 'flex' : 'none';
+    document.getElementById('filtrosSemanal').style.display = t === 'semanal' ? 'flex' : 'none';
+  }
+
+  async function generar() {
+    document.getElementById('metricas').style.display = 'none';
+    document.getElementById('panelTurno').style.display = 'none';
+    document.getElementById('panelDeudas').style.display = 'none';
+    document.getElementById('panelSemanal').style.display = 'none';
+
+    if (tabActual === 'turno') await generarTurno();
+    else await generarSemanal();
+
+    // Siempre cargar deudas
+    await cargarDeudas();
+  }
+
+  // ── TURNO ──────────────────────────────────────────────────
+  async function generarTurno() {
+    const fecha = document.getElementById('fechaTurno').value;
+    const turno = document.getElementById('selTurno').value;
+    if (!fecha) return;
+
+    try {
+      const res = await fetch(`${API}/reportes/turno?fecha=${fecha}&turno=${turno}`);
+      datosActuales = await res.json();
+      const pagos = datosActuales.pagos ?? [];
+      const subs  = datosActuales.subtotales ?? {};
+
+      document.getElementById('tituloTurno').textContent =
+        `Pagos del turno ${turno} — ${formatFecha(fecha)}`;
+
+      // Métricas
+      const efectivo = subs.efectivo ?? 0;
+      const yape = subs.yape ?? 0;
+      document.getElementById('mEfectivo').textContent = `S/${efectivo.toFixed(2)}`;
+      document.getElementById('mYape').textContent = `S/${yape.toFixed(2)}`;
+      document.getElementById('mTotal').textContent = `S/${(efectivo + yape).toFixed(2)}`;
+
+      document.getElementById('metricas').style.display = 'grid';
+      document.getElementById('panelTurno').style.display = 'block';
+
+      if (!pagos.length) {
+        document.getElementById('bodyTurno').innerHTML =
+          `<tr><td colspan="8" class="vacio">Sin pagos registrados en este turno.</td></tr>`;
+        document.getElementById('subtotalesTurno').style.display = 'none';
+        return;
+      }
+
+      document.getElementById('bodyTurno').innerHTML = pagos.map((p, i) => `
+        <tr>
+          <td style="color:var(--suave)">${i + 1}</td>
+          <td><span class="placa">${p.placa}</span></td>
+          <td style="color:var(--suave)">${p.tipoNombre ?? '—'}</td>
+          <td style="color:var(--suave)">—</td>
+          <td><span class="monto monto-verde">S/${p.montoTotal.toFixed(2)}</span></td>
+          <td><span class="badge badge-${p.metodoPago}">${p.metodoPago}</span></td>
+          <td style="color:var(--suave)">${p.operador ?? '—'}</td>
+          <td style="color:var(--suave)">${formatHora(p.fechaPago)}</td>
+        </tr>`).join('');
+
+      document.getElementById('subEfectivo').textContent = `S/${efectivo.toFixed(2)}`;
+      document.getElementById('subYape').textContent = `S/${yape.toFixed(2)}`;
+      document.getElementById('subTotal').textContent = `S/${(efectivo + yape).toFixed(2)}`;
+      document.getElementById('subtotalesTurno').style.display = 'grid';
+
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // ── SEMANAL ────────────────────────────────────────────────
+  async function generarSemanal() {
+    const ini = document.getElementById('fechaIni').value;
+    const fin = document.getElementById('fechaFin').value;
+    if (!ini || !fin) return;
+
+    try {
+      const res = await fetch(`${API}/reportes/semanal?fecha_ini=${ini}&fecha_fin=${fin}`);
+      datosActuales = await res.json();
+      const detalle = datosActuales.detalleDiario ?? [];
+      const ef = datosActuales.totalEfectivo ?? 0;
+      const yp = datosActuales.totalYape ?? 0;
+      const gt = datosActuales.granTotal ?? 0;
+      const maxTotal = Math.max(...detalle.map(d => d.total), 1);
+
+      document.getElementById('tituloSemanal').textContent =
+        `Balance ${formatFecha(ini)} — ${formatFecha(fin)}`;
+
+      // Métricas
+      document.getElementById('mEfectivo').textContent = `S/${ef.toFixed(2)}`;
+      document.getElementById('mYape').textContent = `S/${yp.toFixed(2)}`;
+      document.getElementById('mTotal').textContent = `S/${gt.toFixed(2)}`;
+      document.getElementById('metricas').style.display = 'grid';
+      document.getElementById('panelSemanal').style.display = 'block';
+
+      // Agrupar por día
+      const porDia = {};
+      for (const d of detalle) {
+        if (!porDia[d.dia]) porDia[d.dia] = { efectivo: 0, yape: 0 };
+        porDia[d.dia][d.metodoPago] = d.total;
+      }
+
+      if (!Object.keys(porDia).length) {
+        document.getElementById('barrasWrap').innerHTML = '<div class="vacio">Sin movimientos en este período.</div>';
+        document.getElementById('subtotalesSemanal').style.display = 'none';
+        return;
+      }
+
+      const maxDia = Math.max(...Object.values(porDia).map(d => d.efectivo + d.yape), 1);
+
+      document.getElementById('barrasWrap').innerHTML = Object.entries(porDia).map(([dia, vals]) => {
+        const total = vals.efectivo + vals.yape;
+        const pctEf = (vals.efectivo / maxDia) * 100;
+        const pctYp = (vals.yape / maxDia) * 100;
+        return `<div class="barra-fila">
+          <div class="barra-dia">${dia.slice(5)}</div>
+          <div class="barra-track">
+            <div class="barra-efectivo" style="width:${pctEf}%"></div>
+            <div class="barra-yape" style="width:${pctYp}%"></div>
+          </div>
+          <div class="barra-total">S/${total.toFixed(2)}</div>
+        </div>`;
+      }).join('');
+
+      document.getElementById('semEfectivo').textContent = `S/${ef.toFixed(2)}`;
+      document.getElementById('semYape').textContent = `S/${yp.toFixed(2)}`;
+      document.getElementById('semTotal').textContent = `S/${gt.toFixed(2)}`;
+      document.getElementById('subtotalesSemanal').style.display = 'grid';
+
+    } catch (e) { console.error(e); }
+  }
+
+  // ── DEUDAS ─────────────────────────────────────────────────
+  async function cargarDeudas() {
+    try {
+      const res = await fetch(`${API}/deudas`);
+      deudasActuales = await res.json();
+      const totalDeuda = deudasActuales.reduce((s, d) => s + d.deudaTotal, 0);
+      document.getElementById('mDeuda').textContent = `S/${totalDeuda.toFixed(2)}`;
+
+      document.getElementById('panelDeudas').style.display = 'block';
+
+      if (!deudasActuales.length) {
+        document.getElementById('bodyDeudas').innerHTML =
+          '<tr><td colspan="6" class="vacio">Sin deudas activas.</td></tr>';
+        return;
+      }
+
+      document.getElementById('bodyDeudas').innerHTML = deudasActuales.map(d => `
+        <tr>
+          <td><span class="placa">${d.placa}</span></td>
+          <td style="color:var(--suave)">${d.tipoNombre ?? '—'}</td>
+          <td style="color:var(--suave)">${d.propNombre ?? '—'}</td>
+          <td style="color:var(--suave)">${d.bloquesPendientes}</td>
+          <td><span class="monto monto-rojo">S/${d.deudaTotal.toFixed(2)}</span></td>
+          <td><span class="badge badge-${d.alerta === 'rojo' ? 'rojo' : d.alerta === 'naranja' ? 'naranja' : 'efectivo'}">${d.alerta === 'rojo' ? '⚠ Alta' : d.alerta === 'naranja' ? '! Alerta' : 'Normal'}</span></td>
+        </tr>`).join('');
+    } catch (e) { console.error(e); }
+  }
+
+  // ── EXPORTAR PDF ───────────────────────────────────────────
+  function exportarPDF() { window.print(); }
+
+  // ── EXPORTAR EXCEL ─────────────────────────────────────────
+  function exportarExcel() {
+    if (!datosActuales) { alert('Genera un reporte primero.'); return; }
+
+    let csv = '';
+    if (tabActual === 'turno') {
+      const pagos = datosActuales.pagos ?? [];
+      csv  = 'Placa,Tipo,Monto,Metodo,Operador,Fecha\n';
+      csv += pagos.map(p =>
+        `${p.placa},${p.tipoNombre ?? ''},${p.montoTotal.toFixed(2)},${p.metodoPago},${p.operador ?? ''},${p.fechaPago}`
+      ).join('\n');
+      csv += `\n\nEfectivo,S/${(datosActuales.subtotales?.efectivo ?? 0).toFixed(2)}`;
+      csv += `\nYape,S/${(datosActuales.subtotales?.yape ?? 0).toFixed(2)}`;
+
+      // Agregar deudas
+      if (deudasActuales.length) {
+        csv += '\n\nDeudas activas\nPlaca,Tipo,Propietario,Bloques pend.,Deuda total\n';
+        csv += deudasActuales.map(d =>
+          `${d.placa},${d.tipoNombre ?? ''},${d.propNombre ?? ''},${d.bloquesPendientes},${d.deudaTotal.toFixed(2)}`
+        ).join('\n');
+      }
+    } else {
+      const detalle = datosActuales.detalleDiario ?? [];
+      csv  = 'Fecha,Metodo,Total\n';
+      csv += detalle.map(d => `${d.dia},${d.metodoPago},${d.total.toFixed(2)}`).join('\n');
+      csv += `\n\nTotal efectivo,S/${datosActuales.totalEfectivo?.toFixed(2)}`;
+      csv += `\nTotal Yape,S/${datosActuales.totalYape?.toFixed(2)}`;
+      csv += `\nGran total,S/${datosActuales.granTotal?.toFixed(2)}`;
+    }
+
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `cochera_reporte_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── UTILS ──────────────────────────────────────────────────
+  function formatFecha(iso) {
+    if (!iso) return '—';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  }
+
+  function formatHora(dt) {
+    if (!dt) return '—';
+    return new Date(dt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function cerrarSesion() {
+    localStorage.removeItem('cochera_usuario');
+    window.location.href = 'login.html';
+  }
+
+  init();
+</script>
+</body>
+</html>

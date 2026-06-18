@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cochera — Registro de Pago</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --negro:    #0a0a0a; --carbon:   #141414; --plomo:    #1e1e1e;
+      --borde:    #2a2a2a; --texto:    #e8e8e0; --suave:    #888880;
+      --amarillo: #f0c040; --rojo:     #e05050; --verde:    #50c080;
+      --azul:     #5090e0; --naranja:  #e08030;
+    }
+    html, body { min-height: 100%; background: var(--negro); color: var(--texto); font-family: 'DM Mono', monospace; }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(var(--borde) 1px, transparent 1px), linear-gradient(90deg, var(--borde) 1px, transparent 1px);
+      background-size: 40px 40px; opacity: .2; pointer-events: none;
+    }
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,10,10,.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--borde);
+      padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 56px;
+    }
+    .nav-brand { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.1rem; }
+    .nav-brand span { color: var(--amarillo); }
+    .nav-links { display: flex; gap: .25rem; }
+    .nav-links a {
+      padding: .4rem .85rem; border-radius: 2px; font-size: .72rem;
+      letter-spacing: .08em; text-transform: uppercase; text-decoration: none;
+      color: var(--suave); transition: color .15s, background .15s;
+    }
+    .nav-links a:hover { color: var(--texto); background: var(--plomo); }
+    .nav-links a.activo { color: var(--amarillo); background: rgba(240,192,64,.1); }
+    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    .usuario-badge { font-size: .68rem; color: var(--suave); }
+    .usuario-badge strong { color: var(--texto); }
+    .btn-logout {
+      padding: .35rem .75rem; border: 1px solid var(--borde); border-radius: 2px;
+      background: none; color: var(--suave); font-family: 'DM Mono', monospace;
+      font-size: .68rem; letter-spacing: .08em; text-transform: uppercase;
+      cursor: pointer; transition: color .15s, border-color .15s;
+    }
+    .btn-logout:hover { color: var(--rojo); border-color: var(--rojo); }
+
+    main { max-width: 860px; margin: 0 auto; padding: 2rem; }
+    .page-header {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--borde);
+      animation: fadeIn .4s ease both;
+    }
+    .page-title { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; }
+    .page-sub { margin-top: .4rem; font-size: .72rem; color: var(--suave); }
+
+    .busqueda-wrap {
+      background: var(--carbon); border: 1px solid var(--borde); border-radius: 2px;
+      padding: 1.5rem; margin-bottom: 1.5rem;
+      animation: slideUp .4s cubic-bezier(.16,1,.3,1) both;
+    }
+    .busqueda-row { display: flex; gap: .75rem; align-items: flex-end; }
+    .busqueda-row .campo { flex: 1; }
+    label {
+      display: block; font-size: .62rem; letter-spacing: .15em;
+      text-transform: uppercase; color: var(--suave); margin-bottom: .45rem;
+    }
+    input, select {
+      width: 100%; background: var(--plomo); border: 1px solid var(--borde);
+      border-radius: 2px; padding: .75rem 1rem;
+      font-family: 'DM Mono', monospace; font-size: .88rem; color: var(--texto);
+      outline: none; transition: border-color .2s, box-shadow .2s; appearance: none;
+    }
+    input:focus, select:focus { border-color: var(--amarillo); box-shadow: 0 0 0 3px rgba(240,192,64,.1); }
+    input::placeholder { color: #444; }
+    select option { background: var(--plomo); }
+
+    .btn {
+      padding: .8rem 1.5rem; border-radius: 2px; border: none;
+      font-family: 'Syne', sans-serif; font-size: .88rem; font-weight: 700;
+      letter-spacing: .06em; text-transform: uppercase;
+      cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: .5rem;
+      white-space: nowrap; text-decoration: none;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primario { background: var(--amarillo); color: var(--negro); }
+    .btn-primario:hover { background: #f5ce5a; }
+    .btn-primario:disabled { background: #7a6020; color: #555; pointer-events: none; }
+    .btn-secundario { background: none; border: 1px solid var(--borde); color: var(--suave); }
+    .btn-secundario:hover { border-color: #555; color: var(--texto); }
+    .btn-buscar { background: var(--plomo); border: 1px solid var(--borde); color: var(--texto); font-family: 'Syne', sans-serif; font-weight: 700; letter-spacing: .06em; }
+    .btn-buscar:hover { border-color: var(--amarillo); color: var(--amarillo); }
+
+    .vehiculo-info {
+      background: var(--plomo); border: 1px solid var(--borde); border-radius: 2px;
+      padding: 1rem 1.25rem; margin-top: 1rem;
+      display: none; align-items: center; justify-content: space-between; gap: 1rem;
+    }
+    .vehiculo-info.visible { display: flex; }
+    .veh-placa { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 800; }
+    .veh-detalle { font-size: .75rem; color: var(--suave); margin-top: .2rem; }
+    .badge {
+      display: inline-block; padding: .25rem .65rem; border-radius: 2px;
+      font-size: .65rem; letter-spacing: .1em; text-transform: uppercase; border: 1px solid;
+    }
+    .badge-verde   { color: var(--verde);   border-color: rgba(80,192,128,.3);  background: rgba(80,192,128,.08); }
+    .badge-naranja { color: var(--naranja); border-color: rgba(224,128,48,.3);  background: rgba(224,128,48,.08); }
+    .badge-rojo    { color: var(--rojo);    border-color: rgba(224,80,80,.3);   background: rgba(224,80,80,.08); }
+
+    .panel {
+      background: var(--carbon); border: 1px solid var(--borde); border-radius: 2px;
+      margin-bottom: 1.5rem;
+      animation: slideUp .4s cubic-bezier(.16,1,.3,1) .15s both;
+    }
+    .panel-header {
+      padding: 1rem 1.5rem; border-bottom: 1px solid var(--borde);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel-titulo { font-family: 'Syne', sans-serif; font-size: .85rem; font-weight: 700; letter-spacing: .04em; }
+    .panel-body { padding: 1.25rem 1.5rem; }
+
+    .bloque-item {
+      display: flex; align-items: center; gap: 1rem;
+      padding: .85rem 1rem; border: 1px solid var(--borde); border-radius: 2px;
+      margin-bottom: .6rem; cursor: pointer; transition: all .15s;
+      background: var(--plomo);
+    }
+    .bloque-item:last-child { margin-bottom: 0; }
+    .bloque-item:hover { border-color: #3a3a3a; }
+    .bloque-item.seleccionado { border-color: var(--amarillo); background: rgba(240,192,64,.05); }
+    .bloque-check {
+      width: 18px; height: 18px; border-radius: 2px;
+      border: 1px solid var(--borde); background: var(--carbon);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: all .15s; font-size: .75rem;
+    }
+    .bloque-item.seleccionado .bloque-check { background: var(--amarillo); border-color: var(--amarillo); color: var(--negro); }
+    .bloque-info { flex: 1; }
+    .bloque-titulo { font-size: .82rem; font-weight: 500; }
+    .bloque-sub { font-size: .68rem; color: var(--suave); margin-top: .15rem; }
+    .bloque-precio { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; }
+    .seleccionar-todos { font-size: .65rem; letter-spacing: .1em; text-transform: uppercase; color: var(--amarillo); cursor: pointer; text-decoration: underline; }
+    .vacio { padding: 2rem; text-align: center; color: var(--suave); font-size: .8rem; }
+
+    .metodos { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .metodo-btn {
+      padding: 1rem; border: 1px solid var(--borde); border-radius: 2px;
+      background: var(--plomo); cursor: pointer; transition: all .15s; text-align: center;
+    }
+    .metodo-btn:hover { border-color: #3a3a3a; }
+    .metodo-btn.seleccionado { border-color: var(--amarillo); background: rgba(240,192,64,.07); }
+    .metodo-icono { font-size: 1.4rem; margin-bottom: .4rem; }
+    .metodo-nombre { font-family: 'Syne', sans-serif; font-size: .85rem; font-weight: 700; }
+    .metodo-sub { font-size: .65rem; color: var(--suave); margin-top: .2rem; }
+
+    .total-bar {
+      background: var(--plomo); border: 1px solid var(--borde); border-radius: 2px;
+      padding: 1.25rem 1.5rem; margin-bottom: 1.5rem;
+      display: none; align-items: center; justify-content: space-between;
+      animation: slideUp .4s cubic-bezier(.16,1,.3,1) .25s both;
+    }
+    .total-bar.visible { display: flex; }
+    .total-label { font-size: .65rem; letter-spacing: .15em; text-transform: uppercase; color: var(--suave); }
+    .total-monto { font-family: 'Syne', sans-serif; font-size: 2rem; font-weight: 800; color: var(--amarillo); }
+    .total-detalle { font-size: .7rem; color: var(--suave); margin-top: .2rem; }
+
+    .success-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(10,10,10,.9); backdrop-filter: blur(8px);
+      align-items: center; justify-content: center;
+    }
+    .success-overlay.visible { display: flex; }
+    .success-card {
+      background: var(--carbon); border: 1px solid var(--borde); border-radius: 2px;
+      padding: 3rem 2.5rem; text-align: center; max-width: 400px; width: 90%;
+      animation: slideUp .4s cubic-bezier(.16,1,.3,1) both;
+    }
+    .success-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .success-titulo { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; margin-bottom: .5rem; color: var(--verde); }
+    .success-info { font-size: .8rem; color: var(--suave); line-height: 1.8; margin-bottom: 2rem; }
+    .success-info strong { color: var(--texto); }
+    .success-actions { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+
+    @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">COCHERA<span>.</span></div>
+  <div class="nav-links">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="ingreso.html">Ingreso</a>
+    <a href="pagos.html" class="activo">Pagos</a>
+    <a href="deudas.html">Deudas</a>
+    <a href="reportes.html">Reportes</a>
+  </div>
+  <div class="nav-right">
+    <span class="usuario-badge">Hola, <strong id="navNombre">—</strong></span>
+    <button class="btn-logout" onclick="cerrarSesion()">Salir</button>
+  </div>
+</nav>
+
+<main>
+  <div class="page-header">
+    <div>
+      <div class="page-title">Registrar Pago</div>
+      <div class="page-sub">Selecciona los bloques a cubrir y el método de pago.</div>
+    </div>
+  </div>
+
+  <!-- BÚSQUEDA -->
+  <div class="busqueda-wrap">
+    <div class="busqueda-row">
+      <div class="campo">
+        <label>Placa del vehículo</label>
+        <input type="text" id="inputPlaca" placeholder="Ej: ABC-123"
+          style="text-transform:uppercase;letter-spacing:.1em;font-size:1.05rem"
+          oninput="this.value=this.value.toUpperCase()"
+          onkeydown="if(event.key==='Enter') buscarVehiculo()">
+      </div>
+      <button class="btn btn-buscar" onclick="buscarVehiculo()">Buscar</button>
+    </div>
+    <div class="vehiculo-info" id="vehiculoInfo">
+      <div>
+        <div class="veh-placa" id="vehPlaca">—</div>
+        <div class="veh-detalle" id="vehDetalle">—</div>
+      </div>
+      <div style="text-align:right">
+        <div id="vehDeudaBadge"></div>
+        <div style="font-size:.7rem;color:var(--suave);margin-top:.35rem">Deuda total: <strong id="vehDeudaTotal" style="color:var(--texto)">—</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BLOQUES -->
+  <div class="panel" id="panelBloques" style="display:none">
+    <div class="panel-header">
+      <div class="panel-titulo">Bloques pendientes</div>
+      <span class="seleccionar-todos" onclick="seleccionarTodos()">Seleccionar todos</span>
+    </div>
+    <div class="panel-body" id="listaBloques">
+      <div class="vacio">Cargando...</div>
+    </div>
+  </div>
+
+  <!-- MÉTODO -->
+  <div class="panel" id="panelMetodo" style="display:none">
+    <div class="panel-header">
+      <div class="panel-titulo">Método de pago</div>
+    </div>
+    <div class="panel-body">
+      <div class="metodos">
+        <div class="metodo-btn" id="metodoEfectivo" onclick="selMetodo('efectivo')">
+          <div class="metodo-icono">💵</div>
+          <div class="metodo-nombre">Efectivo</div>
+          <div class="metodo-sub">Pago en mano</div>
+        </div>
+        <div class="metodo-btn" id="metodoYape" onclick="selMetodo('yape')">
+          <div class="metodo-icono">📱</div>
+          <div class="metodo-nombre">Yape</div>
+          <div class="metodo-sub">Transferencia móvil</div>
+        </div>
+      </div>
+      <div style="margin-top:1.25rem">
+        <label>Observación <span style="color:#555;font-size:.55rem">(opcional)</span></label>
+        <input type="text" id="inputObs" placeholder="Notas, acuerdos, etc.">
+      </div>
+    </div>
+  </div>
+
+  <!-- TOTAL -->
+  <div class="total-bar" id="totalBar">
+    <div>
+      <div class="total-label">Total a cobrar</div>
+      <div class="total-detalle" id="totalDetalle">0 bloques seleccionados</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:1.5rem">
+      <div class="total-monto" id="totalMonto">S/0.00</div>
+      <button class="btn btn-primario" id="btnCobrar" onclick="registrarPago()" disabled>
+        Cobrar
+      </button>
+    </div>
+  </div>
+</main>
+
+<!-- ÉXITO -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-card">
+    <div class="success-icon">✓</div>
+    <div class="success-titulo">Pago registrado</div>
+    <div class="success-info" id="successInfo">—</div>
+    <div class="success-actions">
+      <button class="btn btn-primario" onclick="nuevoPago()">+ Otro pago</button>
+      <a href="deudas.html" class="btn btn-secundario">Ver deudas</a>
+      <a href="dashboard.html" class="btn btn-secundario">Dashboard</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = 'http://127.0.0.1:8000';
+  let usuario = null;
+  let vehiculo = null;
+  let bloquesDisponibles = [];
+  let bloquesSeleccionados = new Set();
+  let metodoPago = null;
+
+  function init() {
+    const stored = localStorage.getItem('cochera_usuario');
+    if (!stored) { window.location.href = 'login.html'; return; }
+    usuario = JSON.parse(stored);
+    if (usuario.rol === 'presidenta') { window.location.href = 'dashboard.html'; return; }
+    document.getElementById('navNombre').textContent = usuario.nombre;
+    const params = new URLSearchParams(location.search);
+    const placa = params.get('placa');
+    if (placa) { document.getElementById('inputPlaca').value = placa; buscarVehiculo(); }
+  }
+
+  async function buscarVehiculo() {
+    const placa = document.getElementById('inputPlaca').value.trim().toUpperCase();
+    if (!placa) return;
+    try {
+      const res = await fetch(`${API}/vehiculos/${placa}`);
+      if (!res.ok) { alert(`Vehículo ${placa} no encontrado.`); return; }
+      vehiculo = await res.json();
+
+      document.getElementById('vehiculoInfo').classList.add('visible');
+      document.getElementById('vehPlaca').textContent = vehiculo.placa;
+      document.getElementById('vehDetalle').textContent =
+        [vehiculo.tipoNombre, vehiculo.marcaModelo, vehiculo.propNombre].filter(Boolean).join(' · ');
+
+      const deuda = vehiculo.deudaTotal ?? 0;
+      const limite = vehiculo.limiteDeuda ?? 100;
+      const alerta = deuda > limite ? 'rojo' : deuda > limite * .8 ? 'naranja' : 'verde';
+      document.getElementById('vehDeudaBadge').innerHTML =
+        `<span class="badge badge-${alerta}">${alerta === 'rojo' ? 'Deuda alta' : alerta === 'naranja' ? 'Alerta' : 'OK'}</span>`;
+      document.getElementById('vehDeudaTotal').textContent = `S/${deuda.toFixed(2)}`;
+
+      await cargarBloques(placa);
+    } catch { alert('Error de conexión.'); }
+  }
+
+  async function cargarBloques(placa) {
+    const res = await fetch(`${API}/bloques?placa=${placa}&estado=pendiente`);
+    if (!res.ok) return;
+    bloquesDisponibles = await res.json();
+    bloquesSeleccionados.clear();
+
+    document.getElementById('panelBloques').style.display = 'block';
+    document.getElementById('panelMetodo').style.display = 'block';
+    document.getElementById('totalBar').classList.add('visible');
+
+    if (!bloquesDisponibles.length) {
+      document.getElementById('listaBloques').innerHTML = '<div class="vacio">No hay bloques pendientes para este vehículo.</div>';
+      actualizarTotal(); return;
+    }
+    renderBloques();
+  }
+
+  function renderBloques() {
+    document.getElementById('listaBloques').innerHTML = bloquesDisponibles.map(b => {
+      const sel = bloquesSeleccionados.has(b.idBloque);
+      return `<div class="bloque-item ${sel ? 'seleccionado' : ''}" onclick="toggleBloque(${b.idBloque})">
+        <div class="bloque-check">${sel ? '✓' : ''}</div>
+        <div class="bloque-info">
+          <div class="bloque-titulo">Bloque #${b.idBloque} — Turno ${b.tipoBloque}</div>
+          <div class="bloque-sub">${b.fecha} · ${b.tipoNombre ?? ''}${b.responsablePago ? ' · ' + b.responsablePago : ''}</div>
+        </div>
+        <div class="bloque-precio">S/${b.precio.toFixed(2)}</div>
+      </div>`;
+    }).join('');
+    actualizarTotal();
+  }
+
+  function toggleBloque(id) {
+    if (bloquesSeleccionados.has(id)) bloquesSeleccionados.delete(id);
+    else bloquesSeleccionados.add(id);
+    renderBloques();
+  }
+
+  function seleccionarTodos() {
+    if (bloquesSeleccionados.size === bloquesDisponibles.length) bloquesSeleccionados.clear();
+    else bloquesDisponibles.forEach(b => bloquesSeleccionados.add(b.idBloque));
+    renderBloques();
+  }
+
+  function actualizarTotal() {
+    const sel = bloquesDisponibles.filter(b => bloquesSeleccionados.has(b.idBloque));
+    const total = sel.reduce((s, b) => s + b.precio, 0);
+    document.getElementById('totalMonto').textContent = `S/${total.toFixed(2)}`;
+    document.getElementById('totalDetalle').textContent =
+      `${sel.length} bloque${sel.length !== 1 ? 's' : ''} seleccionado${sel.length !== 1 ? 's' : ''}`;
+    document.getElementById('btnCobrar').disabled = !(sel.length > 0 && metodoPago);
+  }
+
+  function selMetodo(m) {
+    metodoPago = m;
+    document.getElementById('metodoEfectivo').classList.toggle('seleccionado', m === 'efectivo');
+    document.getElementById('metodoYape').classList.toggle('seleccionado', m === 'yape');
+    actualizarTotal();
+  }
+
+  async function registrarPago() {
+    if (!bloquesSeleccionados.size || !metodoPago) return;
+    const btn = document.getElementById('btnCobrar');
+    btn.disabled = true; btn.textContent = 'Procesando...';
+    const ids = Array.from(bloquesSeleccionados);
+    const obs = document.getElementById('inputObs').value.trim() || null;
+    try {
+      const res = await fetch(`${API}/pagos`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ idsBloques: ids, metodoPago, idOperador: usuario.idUsuario, observacion: obs })
+      });
+      if (!res.ok) {
+        const e = await res.json();
+        alert('Error: ' + (e.detail ?? 'No se pudo registrar.'));
+        btn.disabled = false; btn.textContent = 'Cobrar'; return;
+      }
+      const pago = await res.json();
+      document.getElementById('successInfo').innerHTML = `
+        Placa: <strong>${vehiculo.placa}</strong><br>
+        Bloques cubiertos: <strong>${ids.length}</strong><br>
+        Total: <strong style="color:var(--amarillo)">S/${pago.montoTotal.toFixed(2)}</strong><br>
+        Método: <strong>${metodoPago === 'efectivo' ? 'Efectivo' : 'Yape'}</strong><br>
+        Pago #${pago.idPago} registrado.
+      `;
+      document.getElementById('successOverlay').classList.add('visible');
+    } catch {
+      alert('Error de conexión.');
+      btn.disabled = false; btn.textContent = 'Cobrar';
+    }
+  }
+
+  function nuevoPago() {
+    document.getElementById('successOverlay').classList.remove('visible');
+    vehiculo = null; bloquesDisponibles = []; bloquesSeleccionados.clear(); metodoPago = null;
+    document.getElementById('inputPlaca').value = '';
+    document.getElementById('vehiculoInfo').classList.remove('visible');
+    document.getElementById('panelBloques').style.display = 'none';
+    document.getElementById('panelMetodo').style.display = 'none';
+    document.getElementById('totalBar').classList.remove('visible');
+    document.getElementById('metodoEfectivo').classList.remove('seleccionado');
+    document.getElementById('metodoYape').classList.remove('seleccionado');
+    document.getElementById('inputObs').value = '';
+    history.replaceState({}, '', 'pagos.html');
+  }
+
+  function cerrarSesion() {
+    localStorage.removeItem('cochera_usuario');
+    window.location.href = 'login.html';
+  }
+
+  init();
+</script>
+</body>
+</html>
