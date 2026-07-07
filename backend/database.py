@@ -1,27 +1,32 @@
 """
-database.py — Conexión SQLite + helper de sesión para FastAPI
+database.py — Conexión PostgreSQL (Supabase) para FastAPI
 """
-import sqlite3, pathlib
+import os
+import psycopg2
+import psycopg2.extras
 from contextlib import contextmanager
 
-DB_PATH = pathlib.Path(__file__).parent.parent / "db" / "cochera.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
-__all__ = ["DB_PATH", "db_session", "get_con"]
+__all__ = ["DATABASE_URL", "db_session", "get_con"]
 
-def get_con() -> sqlite3.Connection:
-    con = sqlite3.connect(DB_PATH, check_same_thread=False)
-    con.row_factory = sqlite3.Row
-    con.execute("PRAGMA foreign_keys = ON")
+
+def get_con():
+    con = psycopg2.connect(DATABASE_URL)
+    con.autocommit = False
     return con
+
 
 @contextmanager
 def db_session():
     con = get_con()
+    cur = con.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
-        yield con
+        yield cur, con
         con.commit()
     except Exception:
         con.rollback()
         raise
     finally:
+        cur.close()
         con.close()
