@@ -3,6 +3,7 @@ main.py — Backend FastAPI del Sistema de Cochera (PostgreSQL/Supabase)
 """
 import hashlib
 import pathlib
+import re
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 from typing import Optional, List
@@ -104,6 +105,11 @@ async def lifespan(app: FastAPI):
                 ('Bus',10.00),('Camion',10.00)
                 ON CONFLICT (nombre) DO NOTHING;
             """)
+        # ── Migraciones incrementales (tablas ya existentes en Supabase) ──
+        cur.execute("ALTER TABLE propietario ADD COLUMN IF NOT EXISTS dni VARCHAR(8);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_propietario_dni ON propietario(dni);")
+        cur.execute("ALTER TABLE pago ADD COLUMN IF NOT EXISTS tipo_comprobante VARCHAR(10) NOT NULL DEFAULT 'boleta';")
+        cur.execute("ALTER TABLE pago ADD COLUMN IF NOT EXISTS num_documento VARCHAR(11);")
         cur.execute("SELECT COUNT(*) FROM usuario")
         if list(cur.fetchone().values())[0] == 0:
             def sha256(t): return hashlib.sha256(t.encode()).hexdigest()
@@ -161,9 +167,14 @@ def listar_tipos():
 @app.post("/propietarios", response_model=PropietarioOut, status_code=201, tags=["Propietarios"])
 def crear_propietario(body: PropietarioIn):
     with db_session() as (cur, con):
+        if body.dni:
+            cur.execute("SELECT * FROM propietario WHERE dni=%s", (body.dni,))
+            existente = cur.fetchone()
+            if existente:
+                raise HTTPException(400, f"Ya existe un propietario con DNI {body.dni} ({existente['nombre']}).")
         cur.execute(
-            "INSERT INTO propietario (nombre, num_celular, email, direccion) VALUES (%s,%s,%s,%s) RETURNING *",
-            (body.nombre, body.num_celular, body.email, body.direccion)
+            "INSERT INTO propietario (nombre, dni, num_celular, email, direccion) VALUES (%s,%s,%s,%s,%s) RETURNING *",
+            (body.nombre, body.dni, body.num_celular, body.email, body.direccion)
         )
         row = cur.fetchone()
     return dict(row)
@@ -173,8 +184,8 @@ def buscar_propietarios(q: Optional[str] = Query(None)):
     sql = "SELECT * FROM propietario"
     params = []
     if q:
-        sql += " WHERE nombre ILIKE %s OR num_celular ILIKE %s"
-        params = [f"%{q}%", f"%{q}%"]
+        sql += " WHERE nombre ILIKE %s OR num_celular ILIKE %s OR dni ILIKE %s"
+        params = [f"%{q}%", f"%{q}%", f"%{q}%"]
     with db_session() as (cur, con):
         cur.execute(sql, params)
         rows = cur.fetchall()
@@ -202,18 +213,23 @@ def obtener_vehiculo(placa: str):
     return _get_vehiculo(placa.upper())
 
 @app.get("/vehiculos", response_model=List[VehiculoOut], tags=["Vehículos"])
-def buscar_vehiculos(q: Optional[str] = Query(None)):
+def buscar_vehiculos(q: Optional[str] = Query(None), id_prop: Optional[int] = Query(None)):
     sql = """
         SELECT V.*, T.nombre AS tipo_nombre, P.nombre AS prop_nombre,
+               P.dni AS prop_dni, P.num_celular AS prop_celular,
                COALESCE((SELECT SUM(precio) FROM bloque WHERE placa=V.placa AND estado='pendiente'),0) AS deuda_total
         FROM vehiculo V
         JOIN tipo_vehiculo T ON V.id_tipo=T.id_tipo
         LEFT JOIN propietario P ON V.id_prop=P.id_prop
+        WHERE 1=1
     """
     params = []
     if q:
-        sql += " WHERE V.placa ILIKE %s OR P.nombre ILIKE %s"
-        params = [f"%{q}%", f"%{q}%"]
+        sql += " AND (V.placa ILIKE %s OR P.nombre ILIKE %s OR P.dni ILIKE %s)"
+        params += [f"%{q}%", f"%{q}%", f"%{q}%"]
+    if id_prop:
+        sql += " AND V.id_prop=%s"
+        params.append(id_prop)
     with db_session() as (cur, con):
         cur.execute(sql, params)
         rows = cur.fetchall()
@@ -223,6 +239,7 @@ def _get_vehiculo(placa: str) -> dict:
     with db_session() as (cur, con):
         cur.execute("""
             SELECT V.*, T.nombre AS tipo_nombre, P.nombre AS prop_nombre,
+                   P.dni AS prop_dni, P.num_celular AS prop_celular,
                    COALESCE((SELECT SUM(precio) FROM bloque WHERE placa=V.placa AND estado='pendiente'),0) AS deuda_total
             FROM vehiculo V
             JOIN tipo_vehiculo T ON V.id_tipo=T.id_tipo
@@ -308,8 +325,21 @@ def listar_bloques(placa: Optional[str]=None, estado: Optional[str]=None, fecha:
 
 
 # ══ PAGOS ═════════════════════════════════════════════════════
+def _validar_comprobante(tipo_comprobante: str, num_documento: Optional[str]):
+    tipo_comprobante = (tipo_comprobante or "boleta").lower()
+    if tipo_comprobante not in ("boleta", "factura"):
+        raise HTTPException(400, "tipo_comprobante debe ser 'boleta' o 'factura'.")
+    if tipo_comprobante == "boleta" and num_documento:
+        if not re.fullmatch(r"\d{8}", num_documento):
+            raise HTTPException(400, "Para boleta, num_documento debe ser un DNI de 8 dígitos.")
+    if tipo_comprobante == "factura":
+        if not num_documento or not re.fullmatch(r"\d{11}", num_documento):
+            raise HTTPException(400, "Para factura, num_documento debe ser un RUC de 11 dígitos.")
+    return tipo_comprobante
+
 @app.post("/pagos", response_model=PagoOut, status_code=201, tags=["Pagos"])
 def registrar_pago(body: PagoIn):
+    tipo_comprobante = _validar_comprobante(body.tipo_comprobante, body.num_documento)
     with db_session() as (cur, con):
         placeholders = ",".join(["%s"] * len(body.ids_bloques))
         cur.execute(f"SELECT * FROM bloque WHERE id_bloque IN ({placeholders})", body.ids_bloques)
@@ -321,8 +351,9 @@ def registrar_pago(body: PagoIn):
                 raise HTTPException(400, f"Bloque {b['id_bloque']} no está pendiente.")
         monto = sum(float(b["precio"]) for b in bloques)
         cur.execute(
-            "INSERT INTO pago (monto_total,metodo_pago,id_operador,observacion) VALUES (%s,%s,%s,%s) RETURNING id_pago",
-            (monto, body.metodo_pago, body.id_operador, body.observacion)
+            "INSERT INTO pago (monto_total,metodo_pago,id_operador,tipo_comprobante,num_documento,observacion) "
+            "VALUES (%s,%s,%s,%s,%s,%s) RETURNING id_pago",
+            (monto, body.metodo_pago, body.id_operador, tipo_comprobante, body.num_documento, body.observacion)
         )
         id_pago = cur.fetchone()["id_pago"]
         for b in bloques:
@@ -359,9 +390,10 @@ def listar_pagos(fecha_ini: Optional[date]=None, fecha_fin: Optional[date]=None,
 def libro_deudas(q: Optional[str] = Query(None)):
     sql = """
         SELECT V.placa, V.limite_deuda, V.es_frecuente,
-               T.nombre AS tipo_nombre, P.nombre AS prop_nombre, P.num_celular,
+               T.nombre AS tipo_nombre, P.nombre AS prop_nombre, P.num_celular, P.dni,
                COALESCE(SUM(CASE WHEN B.estado='pendiente' THEN B.precio ELSE 0 END),0) AS deuda_total,
-               COUNT(CASE WHEN B.estado='pendiente' THEN 1 END) AS bloques_pendientes
+               COUNT(CASE WHEN B.estado='pendiente' THEN 1 END) AS bloques_pendientes,
+               MIN(CASE WHEN B.estado='pendiente' THEN B.creado_en END) AS deuda_desde
         FROM vehiculo V
         JOIN tipo_vehiculo T ON V.id_tipo=T.id_tipo
         LEFT JOIN propietario P ON V.id_prop=P.id_prop
@@ -370,18 +402,21 @@ def libro_deudas(q: Optional[str] = Query(None)):
     """
     params = []
     if q:
-        sql += " AND (V.placa ILIKE %s OR P.nombre ILIKE %s)"
-        params += [f"%{q}%", f"%{q}%"]
-    sql += " GROUP BY V.placa,V.limite_deuda,V.es_frecuente,T.nombre,P.nombre,P.num_celular HAVING COALESCE(SUM(CASE WHEN B.estado='pendiente' THEN B.precio ELSE 0 END),0)>0 ORDER BY deuda_total DESC"
+        sql += " AND (V.placa ILIKE %s OR P.nombre ILIKE %s OR P.dni ILIKE %s)"
+        params += [f"%{q}%", f"%{q}%", f"%{q}%"]
+    sql += " GROUP BY V.placa,V.limite_deuda,V.es_frecuente,T.nombre,P.nombre,P.num_celular,P.dni HAVING COALESCE(SUM(CASE WHEN B.estado='pendiente' THEN B.precio ELSE 0 END),0)>0 ORDER BY deuda_total DESC"
     with db_session() as (cur, con):
         cur.execute(sql, params)
         rows = cur.fetchall()
     result = []
+    ahora = datetime.now()
     for r in rows:
         d = dict(r)
         deuda = float(d["deuda_total"])
         limite = float(d["limite_deuda"])
         d["alerta"] = "rojo" if deuda > limite else "naranja" if deuda > limite * 0.8 else "normal"
+        desde = d.pop("deuda_desde")
+        d["dias_deuda"] = (ahora - desde).days if desde else 0
         result.append(d)
     return result
 

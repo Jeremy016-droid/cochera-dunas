@@ -154,6 +154,19 @@
     .metodo-nombre { font-family: 'Syne', sans-serif; font-size: .85rem; font-weight: 700; }
     .metodo-sub { font-size: .65rem; color: var(--suave); margin-top: .2rem; }
 
+    .comprobante-tabs { display: flex; gap: .5rem; margin-bottom: .85rem; }
+    .comprobante-tab {
+      flex: 1; padding: .6rem; border: 1px solid var(--borde); border-radius: 2px;
+      background: var(--plomo); cursor: pointer; text-align: center; transition: all .15s;
+      font-family: 'Syne', sans-serif; font-size: .78rem; font-weight: 700; letter-spacing: .04em;
+      color: var(--suave);
+    }
+    .comprobante-tab:hover { border-color: #3a3a3a; }
+    .comprobante-tab.seleccionado { border-color: var(--amarillo); color: var(--amarillo); background: rgba(240,192,64,.07); }
+    .campo-error { font-size: .68rem; color: var(--rojo); margin-top: .4rem; display: none; }
+    .campo-error.visible { display: block; }
+    input.invalido { border-color: var(--rojo); }
+
     .total-bar {
       background: var(--plomo); border: 1px solid var(--borde); border-radius: 2px;
       padding: 1.25rem 1.5rem; margin-bottom: 1.5rem;
@@ -264,6 +277,18 @@
           <div class="metodo-sub">Transferencia móvil</div>
         </div>
       </div>
+
+      <div style="margin-top:1.25rem">
+        <label>Comprobante</label>
+        <div class="comprobante-tabs">
+          <div class="comprobante-tab seleccionado" id="tabBoleta" onclick="selComprobante('boleta')">Boleta</div>
+          <div class="comprobante-tab" id="tabFactura" onclick="selComprobante('factura')">Factura</div>
+        </div>
+        <input type="text" id="inputNumDoc" placeholder="DNI (8 dígitos) — opcional en boleta"
+          inputmode="numeric" maxlength="8" oninput="this.value=this.value.replace(/\D/g,''); validarNumDoc()">
+        <div class="campo-error" id="errorNumDoc">Documento inválido.</div>
+      </div>
+
       <div style="margin-top:1.25rem">
         <label>Observación <span style="color:#555;font-size:.55rem">(opcional)</span></label>
         <input type="text" id="inputObs" placeholder="Notas, acuerdos, etc.">
@@ -307,6 +332,7 @@
   let bloquesDisponibles = [];
   let bloquesSeleccionados = new Set();
   let metodo_pago = null;
+  let tipo_comprobante = 'boleta';
 
   function init() {
     const stored = localStorage.getItem('cochera_usuario');
@@ -393,7 +419,9 @@
     document.getElementById('totalMonto').textContent = `S/${total.toFixed(2)}`;
     document.getElementById('totalDetalle').textContent =
       `${sel.length} bloque${sel.length !== 1 ? 's' : ''} seleccionado${sel.length !== 1 ? 's' : ''}`;
-    document.getElementById('btnCobrar').disabled = !(sel.length > 0 && metodo_pago);
+    const numDoc = document.getElementById('inputNumDoc')?.value.trim() || '';
+    const docOk = tipo_comprobante === 'factura' ? /^\d{11}$/.test(numDoc) : (!numDoc || /^\d{8}$/.test(numDoc));
+    document.getElementById('btnCobrar').disabled = !(sel.length > 0 && metodo_pago && docOk);
   }
 
   function selMetodo(m) {
@@ -403,16 +431,52 @@
     actualizarTotal();
   }
 
+  function selComprobante(tipo) {
+    tipo_comprobante = tipo;
+    document.getElementById('tabBoleta').classList.toggle('seleccionado', tipo === 'boleta');
+    document.getElementById('tabFactura').classList.toggle('seleccionado', tipo === 'factura');
+    const input = document.getElementById('inputNumDoc');
+    input.value = '';
+    input.maxLength = tipo === 'factura' ? 11 : 8;
+    input.placeholder = tipo === 'factura' ? 'RUC (11 dígitos) — obligatorio' : 'DNI (8 dígitos) — opcional en boleta';
+    document.getElementById('errorNumDoc').classList.remove('visible');
+    input.classList.remove('invalido');
+    actualizarTotal();
+  }
+
+  function validarNumDoc() {
+    const val = document.getElementById('inputNumDoc').value.trim();
+    const err = document.getElementById('errorNumDoc');
+    const input = document.getElementById('inputNumDoc');
+    let ok = true;
+    if (tipo_comprobante === 'factura') {
+      ok = /^\d{11}$/.test(val);
+      err.textContent = 'El RUC debe tener 11 dígitos.';
+    } else if (val) {
+      ok = /^\d{8}$/.test(val);
+      err.textContent = 'El DNI debe tener 8 dígitos.';
+    }
+    err.classList.toggle('visible', !ok);
+    input.classList.toggle('invalido', !ok);
+    actualizarTotal();
+    return ok;
+  }
+
   async function registrarPago() {
     if (!bloquesSeleccionados.size || !metodo_pago) return;
+    if (!validarNumDoc()) { alert('Revisa el número de documento del comprobante.'); return; }
     const btn = document.getElementById('btnCobrar');
     btn.disabled = true; btn.textContent = 'Procesando...';
     const ids = Array.from(bloquesSeleccionados);
     const obs = document.getElementById('inputObs').value.trim() || null;
+    const numDoc = document.getElementById('inputNumDoc').value.trim() || null;
     try {
       const res = await fetch(`${API}/pagos`, {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ ids_bloques: ids, metodo_pago, id_operador: usuario.id_usuario, observacion: obs })
+        body: JSON.stringify({
+          ids_bloques: ids, metodo_pago, id_operador: usuario.id_usuario,
+          tipo_comprobante, num_documento: numDoc, observacion: obs
+        })
       });
       if (!res.ok) {
         const e = await res.json();
@@ -425,6 +489,7 @@
         Bloques cubiertos: <strong>${ids.length}</strong><br>
         Total: <strong style="color:var(--amarillo)">S/${pago.monto_total.toFixed(2)}</strong><br>
         Método: <strong>${metodo_pago === 'efectivo' ? 'Efectivo' : 'Yape'}</strong><br>
+        Comprobante: <strong>${tipo_comprobante === 'factura' ? 'Factura' : 'Boleta'}</strong>${numDoc ? ' · ' + numDoc : ''}<br>
         Pago #${pago.id_pago} registrado.
       `;
       document.getElementById('successOverlay').classList.add('visible');
@@ -445,6 +510,10 @@
     document.getElementById('metodoEfectivo').classList.remove('seleccionado');
     document.getElementById('metodoYape').classList.remove('seleccionado');
     document.getElementById('inputObs').value = '';
+    document.getElementById('inputNumDoc').value = '';
+    document.getElementById('errorNumDoc').classList.remove('visible');
+    document.getElementById('inputNumDoc').classList.remove('invalido');
+    selComprobante('boleta');
     history.replaceState({}, '', 'pagos.html');
   }
 

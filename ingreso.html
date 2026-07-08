@@ -99,6 +99,40 @@
     }
     .busqueda-placa .campo { flex: 1; }
 
+    /* TABS MODO BÚSQUEDA */
+    .tabs-busqueda { display: flex; gap: .4rem; margin-bottom: 1rem; }
+    .tab-busqueda {
+      padding: .4rem .9rem; border: 1px solid var(--borde); border-radius: 2px;
+      background: none; font-family: 'DM Mono', monospace; font-size: .68rem;
+      letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+      color: var(--suave); transition: all .15s;
+    }
+    .tab-busqueda:hover { border-color: #444; color: var(--texto); }
+    .tab-busqueda.activo { border-color: var(--amarillo); color: var(--amarillo); background: rgba(240,192,64,.07); }
+
+    .resultado-dni { margin-top: 1rem; }
+    .prop-card {
+      padding: .85rem 1rem; border: 1px solid var(--borde); border-radius: 2px;
+      background: var(--plomo); margin-bottom: .75rem;
+    }
+    .prop-card-nombre { font-family: 'Syne', sans-serif; font-weight: 700; font-size: .85rem; }
+    .prop-card-sub { font-size: .68rem; color: var(--suave); margin-top: .15rem; }
+    .veh-chip-list { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+    .veh-chip {
+      padding: .5rem .85rem; border: 1px solid var(--borde); border-radius: 2px;
+      background: var(--carbon); cursor: pointer; transition: all .15s;
+      font-size: .78rem; display: flex; align-items: center; gap: .5rem;
+    }
+    .veh-chip:hover { border-color: var(--amarillo); color: var(--amarillo); }
+    .veh-chip .veh-chip-placa { font-family: 'Syne', sans-serif; font-weight: 800; }
+    .veh-chip .veh-chip-deuda { font-size: .65rem; color: var(--rojo); }
+
+    .campo-error {
+      font-size: .68rem; color: var(--rojo); margin-top: .4rem; display: none;
+    }
+    .campo-error.visible { display: block; }
+    input.invalido { border-color: var(--rojo); }
+
     /* CAMPOS */
     .campo { margin-bottom: 1.25rem; }
     .campo:last-child { margin-bottom: 0; }
@@ -241,16 +275,33 @@
 
       <!-- PASO 1: búsqueda -->
       <div id="paso1">
-        <div class="busqueda-placa">
+        <div class="tabs-busqueda">
+          <button class="tab-busqueda activo" id="tabPlaca" onclick="cambiarModoBusqueda('placa')">Buscar por placa</button>
+          <button class="tab-busqueda" id="tabDni" onclick="cambiarModoBusqueda('dni')">Buscar por DNI</button>
+        </div>
+
+        <div class="busqueda-placa" id="wrapBusquedaPlaca">
           <div class="campo">
             <label>Placa del vehículo</label>
             <input type="text" id="inputPlaca" placeholder="Ej: ABC-123"
               style="text-transform:uppercase; letter-spacing:.1em; font-size:1.1rem;"
-              oninput="this.value=this.value.toUpperCase()"
+              oninput="this.value=this.value.toUpperCase(); validarPlacaActual()"
               onkeydown="if(event.key==='Enter') buscarPlaca()">
           </div>
           <button class="btn btn-buscar" onclick="buscarPlaca()">Buscar</button>
         </div>
+
+        <div class="busqueda-placa" id="wrapBusquedaDni" style="display:none">
+          <div class="campo">
+            <label>DNI del propietario</label>
+            <input type="text" id="inputDni" placeholder="Ej: 12345678" maxlength="8"
+              inputmode="numeric" style="letter-spacing:.1em; font-size:1.1rem;"
+              oninput="this.value=this.value.replace(/\D/g,'')"
+              onkeydown="if(event.key==='Enter') buscarPorDni()">
+          </div>
+          <button class="btn btn-buscar" onclick="buscarPorDni()">Buscar</button>
+        </div>
+        <div class="resultado-dni" id="resultadoDni"></div>
 
         <div class="resultado-busqueda" id="resultadoBusqueda"></div>
 
@@ -260,10 +311,11 @@
 
           <div class="campo">
             <label>Tipo de vehículo</label>
-            <select id="selTipo" onchange="actualizarTarifa()">
+            <select id="selTipo" onchange="actualizarTarifa(); validarPlacaActual()">
               <option value="">— Seleccionar —</option>
             </select>
           </div>
+          <div class="campo-error" id="errorPlaca">Formato de placa no reconocido para este tipo de vehículo.</div>
 
           <div class="grid-2">
             <div class="campo">
@@ -285,6 +337,15 @@
               <label>Celular <span class="opcional">(opcional)</span></label>
               <input type="text" id="inputPropCelular" placeholder="Ej: 987654321">
             </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="campo">
+              <label>DNI propietario <span class="opcional">(opcional)</span></label>
+              <input type="text" id="inputPropDni" placeholder="Ej: 12345678" maxlength="8"
+                inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
+            </div>
+            <div></div>
           </div>
 
           <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;margin-top:.5rem">
@@ -371,6 +432,96 @@
   let tiposVehiculo = [];
   let esNuevo = false;
 
+  // ── VALIDACIÓN DE PLACA ──────────────────────────────────────
+  // Perú: formato estándar (autos/otros) = 3 letras + 3 dígitos (ABC-123).
+  // Motos/mototaxis: el formato está en transición — se acepta el histórico
+  // (2 letras + 4 dígitos), el vigente desde 2024 (3 letras + 4 dígitos, DS 021-2024-MTC)
+  // y el numérico Mercosur (6-7 dígitos) habilitado desde 2026. Ajustar si el MTC cambia de nuevo.
+  function validarFormatoPlaca(placa, tipoNombre) {
+    const p = (placa || '').trim().toUpperCase().replace(/\s+/g, '');
+    if (!p) return false;
+    if ((tipoNombre || '').toLowerCase() === 'moto') {
+      return /^[A-Z]{1,3}-?\d{3,4}$/.test(p) || /^\d{6,7}$/.test(p);
+    }
+    return /^[A-Z]{3}-?\d{3}$/.test(p);
+  }
+
+  function validarPlacaActual() {
+    const sel = document.getElementById('selTipo');
+    const opt = sel.options[sel.selectedIndex];
+    const tipoNombre = opt ? opt.dataset.nombre : null;
+    const placa = document.getElementById('inputPlaca').value;
+    const err = document.getElementById('errorPlaca');
+    const inputEl = document.getElementById('inputPlaca');
+    if (!tipoNombre || !placa) { err.classList.remove('visible'); inputEl.classList.remove('invalido'); return true; }
+    const ok = validarFormatoPlaca(placa, tipoNombre);
+    err.classList.toggle('visible', !ok);
+    inputEl.classList.toggle('invalido', !ok);
+    if (!ok) {
+      err.textContent = tipoNombre.toLowerCase() === 'moto'
+        ? 'Formato de placa de moto no reconocido (ej: ABC-1234 o V1A-123).'
+        : 'Formato de placa no reconocido (ej: ABC-123).';
+    }
+    return ok;
+  }
+
+  // ── MODO DE BÚSQUEDA (placa / DNI) ───────────────────────────
+  function cambiarModoBusqueda(modo) {
+    document.getElementById('tabPlaca').classList.toggle('activo', modo === 'placa');
+    document.getElementById('tabDni').classList.toggle('activo', modo === 'dni');
+    document.getElementById('wrapBusquedaPlaca').style.display = modo === 'placa' ? 'flex' : 'none';
+    document.getElementById('wrapBusquedaDni').style.display = modo === 'dni' ? 'flex' : 'none';
+    document.getElementById('resultadoDni').innerHTML = '';
+    if (modo === 'placa') document.getElementById('resultadoBusqueda').style.display = 'none';
+  }
+
+  async function buscarPorDni() {
+    const dni = document.getElementById('inputDni').value.trim();
+    const cont = document.getElementById('resultadoDni');
+    if (dni.length !== 8) {
+      cont.innerHTML = `<div class="resultado-busqueda error-deuda" style="display:block">El DNI debe tener 8 dígitos.</div>`;
+      return;
+    }
+    cont.innerHTML = `<div class="resultado-busqueda" style="display:block">Buscando…</div>`;
+    try {
+      const rp = await fetch(`${API}/propietarios?q=${dni}`);
+      const props = (await rp.json()).filter(p => p.dni === dni);
+      if (!props.length) {
+        cont.innerHTML = `<div class="resultado-busqueda no-encontrado" style="display:block">No se encontró ningún propietario con DNI ${dni}. Puedes registrarlo al vuelo buscando por placa.</div>`;
+        return;
+      }
+      const prop = props[0];
+      const rv = await fetch(`${API}/vehiculos?id_prop=${prop.id_prop}`);
+      const vehiculos = await rv.json();
+
+      cont.innerHTML = `
+        <div class="prop-card">
+          <div class="prop-card-nombre">${prop.nombre}</div>
+          <div class="prop-card-sub">DNI ${prop.dni}${prop.num_celular ? ' · ' + prop.num_celular : ''}</div>
+          ${vehiculos.length ? `
+            <div style="font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--suave);margin-top:.85rem">Vehículos registrados — elige uno</div>
+            <div class="veh-chip-list">
+              ${vehiculos.map(v => `
+                <div class="veh-chip" onclick="seleccionarVehiculoDni('${v.placa}')">
+                  <span class="veh-chip-placa">${v.placa}</span>
+                  <span>${v.tipo_nombre ?? ''}</span>
+                  ${v.deuda_total > 0 ? `<span class="veh-chip-deuda">Deuda S/${v.deuda_total.toFixed(2)}</span>` : ''}
+                </div>`).join('')}
+            </div>
+          ` : `<div style="font-size:.75rem;color:var(--suave);margin-top:.75rem">Sin vehículos registrados a su nombre todavía.</div>`}
+        </div>
+      `;
+    } catch {
+      cont.innerHTML = `<div class="resultado-busqueda error-deuda" style="display:block">Error de conexión con el servidor.</div>`;
+    }
+  }
+
+  function seleccionarVehiculoDni(placa) {
+    cambiarModoBusqueda('placa');
+    document.getElementById('inputPlaca').value = placa;
+    buscarPlaca();
+  }
+
   // ── INIT ──────────────────────────────────────────────────
   async function init() {
     const stored = localStorage.getItem('cochera_usuario');
@@ -435,7 +586,7 @@
           res_el.textContent = alertaDeuda + ' — Puedes continuar con autorización.';
         } else {
           res_el.className = 'resultado-busqueda encontrado';
-          res_el.textContent = `✓ Vehículo encontrado — ${v.tipo_nombre}${v.marca_modelo ? ' · ' + v.marca_modelo : ''}${v.prop_nombre ? ' · Prop: ' + v.prop_nombre : ''} — Deuda: S/${v.deuda_total.toFixed(2)}`;
+          res_el.textContent = `✓ Vehículo encontrado — ${v.tipo_nombre}${v.marca_modelo ? ' · ' + v.marca_modelo : ''}${v.prop_nombre ? ' · Prop: ' + v.prop_nombre : ''}${v.prop_dni ? ' (DNI ' + v.prop_dni + ')' : ''} — Deuda: S/${v.deuda_total.toFixed(2)}`;
         }
 
         document.getElementById('seccionNuevo').classList.remove('visible');
@@ -487,6 +638,10 @@
         alert('Selecciona el tipo de vehículo.');
         return;
       }
+      if (!validarPlacaActual()) {
+        alert('La placa no tiene un formato válido para el tipo de vehículo seleccionado.');
+        return;
+      }
     }
 
     // Si es nuevo: registrar vehículo primero
@@ -497,7 +652,13 @@
       const color  = document.getElementById('inputColor').value.trim() || null;
       const prop_nombre  = document.getElementById('inputPropNombre').value.trim();
       const propCelular = document.getElementById('inputPropCelular').value.trim();
+      const propDni = document.getElementById('inputPropDni').value.trim();
       const frecuente   = document.getElementById('chkFrecuente').checked;
+
+      if (propDni && propDni.length !== 8) {
+        alert('El DNI del propietario debe tener 8 dígitos.');
+        return;
+      }
 
       try {
         // Crear propietario si tiene nombre
@@ -505,9 +666,10 @@
         if (prop_nombre) {
           const rp = await fetch(`${API}/propietarios`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ nombre: prop_nombre, num_celular: propCelular || null })
+            body: JSON.stringify({ nombre: prop_nombre, dni: propDni || null, num_celular: propCelular || null })
           });
           if (rp.ok) { const p = await rp.json(); id_prop = p.id_prop; }
+          else { const e = await rp.json(); alert('Aviso propietario: ' + (e.detail ?? '')); }
         }
 
         const rv = await fetch(`${API}/vehiculos`, {
@@ -616,6 +778,12 @@
     // Reset
     vehiculoEncontrado = null; esNuevo = false;
     document.getElementById('inputPlaca').value = '';
+    document.getElementById('inputDni').value = '';
+    document.getElementById('inputPropDni').value = '';
+    document.getElementById('resultadoDni').innerHTML = '';
+    document.getElementById('errorPlaca').classList.remove('visible');
+    document.getElementById('inputPlaca').classList.remove('invalido');
+    cambiarModoBusqueda('placa');
     document.getElementById('resultadoBusqueda').style.display = 'none';
     document.getElementById('seccionNuevo').classList.remove('visible');
     document.getElementById('tarifaPreview').classList.remove('visible');

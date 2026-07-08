@@ -149,6 +149,10 @@
     .deuda-naranja { color: var(--naranja); }
     .deuda-rojo    { color: var(--rojo); }
 
+    .dias-deuda { font-size: .78rem; color: var(--suave); }
+    .dias-deuda.dias-alerta { color: var(--rojo); font-weight: 600; }
+    .dias-deuda .dias-num { font-family: 'Syne', sans-serif; }
+
     .barra-deuda {
       width: 100%; height: 4px; background: var(--borde); border-radius: 2px; margin-top: .4rem; overflow: hidden;
     }
@@ -293,7 +297,7 @@
 
   <!-- CONTROLES -->
   <div class="controles">
-    <input type="text" id="busqueda" placeholder="Buscar por placa o propietario..." oninput="filtrar()">
+    <input type="text" id="busqueda" placeholder="Buscar por placa, propietario o DNI..." oninput="filtrar()">
     <div class="filtros">
       <button class="filtro-btn activo" onclick="setFiltro('todos', this)">Todos</button>
       <button class="filtro-btn" onclick="setFiltro('normal', this)">Normal</button>
@@ -310,6 +314,7 @@
           <th>Placa</th>
           <th>Tipo / Propietario</th>
           <th>Deuda</th>
+          <th>Deuda desde</th>
           <th>Límite</th>
           <th>Bloques</th>
           <th>Estado</th>
@@ -317,7 +322,7 @@
         </tr>
       </thead>
       <tbody id="tablaBody">
-        <tr><td colspan="7" class="vacio">Cargando...</td></tr>
+        <tr><td colspan="8" class="vacio">Cargando...</td></tr>
       </tbody>
     </table>
     <div class="tabla-footer">
@@ -398,7 +403,7 @@
 
     if (!filtrados.length) {
       document.getElementById('tablaBody').innerHTML =
-        `<tr><td colspan="7" class="vacio">No hay deudas${filtroActual !== 'todos' ? ' con alerta ' + filtroActual : ''} en este momento.</td></tr>`;
+        `<tr><td colspan="8" class="vacio">No hay deudas${filtroActual !== 'todos' ? ' con alerta ' + filtroActual : ''} en este momento.</td></tr>`;
       return;
     }
 
@@ -410,6 +415,10 @@
         : d.alerta === 'naranja'
         ? '<span class="badge badge-naranja">! Alerta</span>'
         : '<span class="badge badge-verde">OK</span>';
+
+      const dias = d.dias_deuda ?? 0;
+      const diasTexto = dias === 0 ? 'Hoy' : dias === 1 ? 'Hace 1 día' : `Hace ${dias} días`;
+      const diasHtml = `<span class="dias-deuda${dias >= 30 ? ' dias-alerta' : ''}">${dias >= 30 ? '⚠ ' : ''}${diasTexto}</span>`;
 
       const acciones = soloLectura ? '<td>—</td>' : `
         <td>
@@ -423,12 +432,13 @@
         <td><span class="placa">${d.placa}</span></td>
         <td>
           <div>${d.tipo_nombre ?? '—'}</div>
-          <div style="font-size:.68rem;color:var(--suave);margin-top:.15rem">${d.prop_nombre ?? '—'}${d.num_celular ? ' · ' + d.num_celular : ''}</div>
+          <div style="font-size:.68rem;color:var(--suave);margin-top:.15rem">${d.prop_nombre ?? '—'}${d.dni ? ' · DNI ' + d.dni : ''}${d.num_celular ? ' · ' + d.num_celular : ''}</div>
         </td>
         <td>
           <div class="deuda-monto ${colorClase}">S/${d.deuda_total.toFixed(2)}</div>
           <div class="barra-deuda"><div class="barra-fill barra-${d.alerta === 'normal' ? 'verde' : d.alerta}" style="width:${pct}%"></div></div>
         </td>
+        <td>${diasHtml}</td>
         <td style="color:var(--suave)">S/${d.limite_deuda.toFixed(2)}</td>
         <td style="color:var(--suave)">${d.bloques_pendientes}</td>
         <td>${badgeHtml}</td>
@@ -463,9 +473,11 @@
           <div><div class="info-item-label">Placa</div><div class="info-item-val" style="font-family:'Syne',sans-serif;font-weight:800">${v.placa}</div></div>
           <div><div class="info-item-label">Tipo</div><div class="info-item-val">${v.tipo_nombre ?? '—'}</div></div>
           <div><div class="info-item-label">Propietario</div><div class="info-item-val">${v.prop_nombre ?? '—'}</div></div>
+          <div><div class="info-item-label">DNI</div><div class="info-item-val">${deudaObj.dni ?? '—'}</div></div>
           <div><div class="info-item-label">Celular</div><div class="info-item-val">${deudaObj.num_celular ?? '—'}</div></div>
           <div><div class="info-item-label">Descripción</div><div class="info-item-val">${v.marca_modelo ?? '—'}</div></div>
           <div><div class="info-item-label">Frecuente</div><div class="info-item-val">${v.es_frecuente ? 'Sí' : 'No'}</div></div>
+          <div><div class="info-item-label">Deuda desde</div><div class="info-item-val">${(deudaObj.dias_deuda ?? 0) === 0 ? 'Hoy' : `Hace ${deudaObj.dias_deuda} días`}</div></div>
         </div>
 
         <div style="background:var(--plomo);border:1px solid var(--borde);border-radius:2px;padding:1rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between">

@@ -16,6 +16,7 @@ class TipoVehiculoOut(BaseModel):
 # ── PROPIETARIO ───────────────────────────────────────────────
 class PropietarioIn(BaseModel):
     nombre: str
+    dni: Optional[str] = None
     num_celular: Optional[str] = None
     email: Optional[str] = None
     direccion: Optional[str] = None
@@ -44,6 +45,8 @@ class VehiculoOut(BaseModel):
     es_frecuente: bool
     tipo_nombre: Optional[str] = None
     prop_nombre: Optional[str] = None
+    prop_dni: Optional[str] = None
+    prop_celular: Optional[str] = None
     deuda_total: float = 0.0
 
 
@@ -71,6 +74,8 @@ class PagoIn(BaseModel):
     ids_bloques: List[int]
     metodo_pago: str
     id_operador: int
+    tipo_comprobante: str = "boleta"     # 'boleta' | 'factura'
+    num_documento: Optional[str] = None  # DNI (8 dig.) si boleta, RUC (11 dig.) si factura
     observacion: Optional[str] = None
 
 class PagoOut(BaseModel):
@@ -79,6 +84,8 @@ class PagoOut(BaseModel):
     monto_total: float
     metodo_pago: str
     id_operador: int
+    tipo_comprobante: str = "boleta"
+    num_documento: Optional[str] = None
     observacion: Optional[str] = None
     bloques_cubiertos: List[int] = []
 
