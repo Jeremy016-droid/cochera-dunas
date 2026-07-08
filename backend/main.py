@@ -98,9 +98,9 @@ async def lifespan(app: FastAPI):
         """)
 
         # Insertar tipos de vehiculo si no existen
-        cur.execute("SELECT COUNT(*) as n FROM TIPO_VEHICULO")
+        cur.execute("SELECT COUNT(*) FROM TIPO_VEHICULO")
         row = cur.fetchone()
-        if row["count"] == 0:
+        if list(row.values())[0] == 0:
             cur.execute("""
                 INSERT INTO TIPO_VEHICULO (nombre, tarifa) VALUES
                 ('Moto', 3.00), ('Auto', 5.00), ('Camioneta', 5.00),
@@ -110,9 +110,9 @@ async def lifespan(app: FastAPI):
             """)
 
         # Insertar usuarios por defecto si no existen
-        cur.execute("SELECT COUNT(*) as n FROM USUARIO")
+        cur.execute("SELECT COUNT(*) FROM USUARIO")
         row = cur.fetchone()
-        if row["count"] == 0:
+        if list(row.values())[0] == 0:
             def sha256(t): return hashlib.sha256(t.encode()).hexdigest()
             cur.execute("""
                 INSERT INTO USUARIO (nombre, username, passwordHash, rol) VALUES
