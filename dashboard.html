@@ -505,10 +505,10 @@
       if (!res.ok) throw new Error();
       const d = await res.json();
 
-      setMetrica('mPresentes', d.vehiculosPresentes);
-      setMetrica('mIngresos',  'S/' + d.ingresosTurno.toFixed(2));
-      setMetrica('mDeuda',     'S/' + d.deudaTotal.toFixed(2));
-      setMetrica('mBloques',   d.bloquesPendientes);
+      setMetrica('mPresentes', d.vehiculos_presentes);
+      setMetrica('mIngresos',  'S/' + d.ingresos_turno.toFixed(2));
+      setMetrica('mDeuda',     'S/' + d.deuda_total.toFixed(2));
+      setMetrica('mBloques',   d.bloques_pendientes);
     } catch {
       ['mPresentes','mIngresos','mDeuda','mBloques'].forEach(id => {
         document.getElementById(id).textContent = '—';
@@ -552,9 +552,9 @@
 
       vehiculosData = Object.values(porPlaca).map(b => ({
         ...b,
-        deudaTotal: deudaMap[b.placa]?.deudaTotal ?? 0,
+        deuda_total: deudaMap[b.placa]?.deuda_total ?? 0,
         alerta:     deudaMap[b.placa]?.alerta ?? 'normal',
-        propNombre: deudaMap[b.placa]?.propNombre ?? null,
+        prop_nombre: deudaMap[b.placa]?.prop_nombre ?? null,
       }));
 
       renderTabla(vehiculosData);
@@ -583,16 +583,16 @@
         <td>
           <div class="fila-acciones">
             <a href="pagos.html?placa=${v.placa}" class="btn-fila">Cobrar</a>
-            <button class="btn-fila" onclick="anularBloque(${v.idBloque}, '${v.placa}')">Anular</button>
+            <button class="btn-fila" onclick="anularBloque(${v.id_bloque}, '${v.placa}')">Anular</button>
           </div>
         </td>`;
 
       return `<tr>
         <td><span class="placa">${v.placa}</span></td>
-        <td>${v.tipoNombre ?? '—'}</td>
+        <td>${v.tipo_nombre ?? '—'}</td>
         <td style="color:var(--suave)">${v.placa}</td>
-        <td><span class="badge badge-azul">${v.tipoBloque}</span></td>
-        <td><span class="deuda-monto ${deudaClass}">S/${v.deudaTotal.toFixed(2)}</span></td>
+        <td><span class="badge badge-azul">${v.tipo_bloque}</span></td>
+        <td><span class="deuda-monto ${deudaClass}">S/${v.deuda_total.toFixed(2)}</span></td>
         <td>${badgeDeuda}</td>
         ${acciones}
       </tr>`;
@@ -603,16 +603,16 @@
     const q = document.getElementById('busqueda').value.toLowerCase();
     const filtrado = vehiculosData.filter(v =>
       v.placa.toLowerCase().includes(q) ||
-      (v.propNombre ?? '').toLowerCase().includes(q)
+      (v.prop_nombre ?? '').toLowerCase().includes(q)
     );
     renderTabla(filtrado);
   }
 
   // ── anular bloque ──────────────────────────────────────────
-  async function anularBloque(idBloque, placa) {
+  async function anularBloque(id_bloque, placa) {
     if (!confirm(`¿Anular el bloque de ${placa}? (vehículo se retiró antes de mitad del turno)`)) return;
     try {
-      const res = await fetch(`${API}/bloques/${idBloque}/anular`, { method: 'PATCH' });
+      const res = await fetch(`${API}/bloques/${id_bloque}/anular`, { method: 'PATCH' });
       if (!res.ok) {
         const err = await res.json();
         alert('Error: ' + (err.detail ?? 'No se pudo anular.'));

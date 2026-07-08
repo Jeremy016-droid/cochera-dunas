@@ -306,7 +306,7 @@
   let vehiculo = null;
   let bloquesDisponibles = [];
   let bloquesSeleccionados = new Set();
-  let metodoPago = null;
+  let metodo_pago = null;
 
   function init() {
     const stored = localStorage.getItem('cochera_usuario');
@@ -330,10 +330,10 @@
       document.getElementById('vehiculoInfo').classList.add('visible');
       document.getElementById('vehPlaca').textContent = vehiculo.placa;
       document.getElementById('vehDetalle').textContent =
-        [vehiculo.tipoNombre, vehiculo.marcaModelo, vehiculo.propNombre].filter(Boolean).join(' · ');
+        [vehiculo.tipo_nombre, vehiculo.marca_modelo, vehiculo.prop_nombre].filter(Boolean).join(' · ');
 
-      const deuda = vehiculo.deudaTotal ?? 0;
-      const limite = vehiculo.limiteDeuda ?? 100;
+      const deuda = vehiculo.deuda_total ?? 0;
+      const limite = vehiculo.limite_deuda ?? 100;
       const alerta = deuda > limite ? 'rojo' : deuda > limite * .8 ? 'naranja' : 'verde';
       document.getElementById('vehDeudaBadge').innerHTML =
         `<span class="badge badge-${alerta}">${alerta === 'rojo' ? 'Deuda alta' : alerta === 'naranja' ? 'Alerta' : 'OK'}</span>`;
@@ -362,12 +362,12 @@
 
   function renderBloques() {
     document.getElementById('listaBloques').innerHTML = bloquesDisponibles.map(b => {
-      const sel = bloquesSeleccionados.has(b.idBloque);
-      return `<div class="bloque-item ${sel ? 'seleccionado' : ''}" onclick="toggleBloque(${b.idBloque})">
+      const sel = bloquesSeleccionados.has(b.id_bloque);
+      return `<div class="bloque-item ${sel ? 'seleccionado' : ''}" onclick="toggleBloque(${b.id_bloque})">
         <div class="bloque-check">${sel ? '✓' : ''}</div>
         <div class="bloque-info">
-          <div class="bloque-titulo">Bloque #${b.idBloque} — Turno ${b.tipoBloque}</div>
-          <div class="bloque-sub">${b.fecha} · ${b.tipoNombre ?? ''}${b.responsablePago ? ' · ' + b.responsablePago : ''}</div>
+          <div class="bloque-titulo">Bloque #${b.id_bloque} — Turno ${b.tipo_bloque}</div>
+          <div class="bloque-sub">${b.fecha} · ${b.tipo_nombre ?? ''}${b.responsable_pago ? ' · ' + b.responsable_pago : ''}</div>
         </div>
         <div class="bloque-precio">S/${b.precio.toFixed(2)}</div>
       </div>`;
@@ -383,28 +383,28 @@
 
   function seleccionarTodos() {
     if (bloquesSeleccionados.size === bloquesDisponibles.length) bloquesSeleccionados.clear();
-    else bloquesDisponibles.forEach(b => bloquesSeleccionados.add(b.idBloque));
+    else bloquesDisponibles.forEach(b => bloquesSeleccionados.add(b.id_bloque));
     renderBloques();
   }
 
   function actualizarTotal() {
-    const sel = bloquesDisponibles.filter(b => bloquesSeleccionados.has(b.idBloque));
+    const sel = bloquesDisponibles.filter(b => bloquesSeleccionados.has(b.id_bloque));
     const total = sel.reduce((s, b) => s + b.precio, 0);
     document.getElementById('totalMonto').textContent = `S/${total.toFixed(2)}`;
     document.getElementById('totalDetalle').textContent =
       `${sel.length} bloque${sel.length !== 1 ? 's' : ''} seleccionado${sel.length !== 1 ? 's' : ''}`;
-    document.getElementById('btnCobrar').disabled = !(sel.length > 0 && metodoPago);
+    document.getElementById('btnCobrar').disabled = !(sel.length > 0 && metodo_pago);
   }
 
   function selMetodo(m) {
-    metodoPago = m;
+    metodo_pago = m;
     document.getElementById('metodoEfectivo').classList.toggle('seleccionado', m === 'efectivo');
     document.getElementById('metodoYape').classList.toggle('seleccionado', m === 'yape');
     actualizarTotal();
   }
 
   async function registrarPago() {
-    if (!bloquesSeleccionados.size || !metodoPago) return;
+    if (!bloquesSeleccionados.size || !metodo_pago) return;
     const btn = document.getElementById('btnCobrar');
     btn.disabled = true; btn.textContent = 'Procesando...';
     const ids = Array.from(bloquesSeleccionados);
@@ -412,7 +412,7 @@
     try {
       const res = await fetch(`${API}/pagos`, {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ idsBloques: ids, metodoPago, idOperador: usuario.idUsuario, observacion: obs })
+        body: JSON.stringify({ ids_bloques: ids, metodo_pago, id_operador: usuario.id_usuario, observacion: obs })
       });
       if (!res.ok) {
         const e = await res.json();
@@ -423,9 +423,9 @@
       document.getElementById('successInfo').innerHTML = `
         Placa: <strong>${vehiculo.placa}</strong><br>
         Bloques cubiertos: <strong>${ids.length}</strong><br>
-        Total: <strong style="color:var(--amarillo)">S/${pago.montoTotal.toFixed(2)}</strong><br>
-        Método: <strong>${metodoPago === 'efectivo' ? 'Efectivo' : 'Yape'}</strong><br>
-        Pago #${pago.idPago} registrado.
+        Total: <strong style="color:var(--amarillo)">S/${pago.monto_total.toFixed(2)}</strong><br>
+        Método: <strong>${metodo_pago === 'efectivo' ? 'Efectivo' : 'Yape'}</strong><br>
+        Pago #${pago.id_pago} registrado.
       `;
       document.getElementById('successOverlay').classList.add('visible');
     } catch {
@@ -436,7 +436,7 @@
 
   function nuevoPago() {
     document.getElementById('successOverlay').classList.remove('visible');
-    vehiculo = null; bloquesDisponibles = []; bloquesSeleccionados.clear(); metodoPago = null;
+    vehiculo = null; bloquesDisponibles = []; bloquesSeleccionados.clear(); metodo_pago = null;
     document.getElementById('inputPlaca').value = '';
     document.getElementById('vehiculoInfo').classList.remove('visible');
     document.getElementById('panelBloques').style.display = 'none';

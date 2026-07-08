@@ -399,7 +399,7 @@
     const sel = document.getElementById('selTipo');
     tiposVehiculo.forEach(t => {
       const opt = document.createElement('option');
-      opt.value = t.idTipo;
+      opt.value = t.id_tipo;
       opt.textContent = `${t.nombre} — S/${t.tarifa.toFixed(2)}`;
       opt.dataset.tarifa = t.tarifa;
       opt.dataset.nombre = t.nombre;
@@ -426,8 +426,8 @@
         esNuevo = false;
 
         // Verificar deuda
-        const alertaDeuda = v.deudaTotal > v.limiteDeuda
-          ? `⚠ Deuda S/${v.deudaTotal.toFixed(2)} supera el límite (S/${v.limiteDeuda.toFixed(2)})`
+        const alertaDeuda = v.deuda_total > v.limite_deuda
+          ? `⚠ Deuda S/${v.deuda_total.toFixed(2)} supera el límite (S/${v.limite_deuda.toFixed(2)})`
           : null;
 
         if (alertaDeuda) {
@@ -435,11 +435,11 @@
           res_el.textContent = alertaDeuda + ' — Puedes continuar con autorización.';
         } else {
           res_el.className = 'resultado-busqueda encontrado';
-          res_el.textContent = `✓ Vehículo encontrado — ${v.tipoNombre}${v.marcaModelo ? ' · ' + v.marcaModelo : ''}${v.propNombre ? ' · Prop: ' + v.propNombre : ''} — Deuda: S/${v.deudaTotal.toFixed(2)}`;
+          res_el.textContent = `✓ Vehículo encontrado — ${v.tipo_nombre}${v.marca_modelo ? ' · ' + v.marca_modelo : ''}${v.prop_nombre ? ' · Prop: ' + v.prop_nombre : ''} — Deuda: S/${v.deuda_total.toFixed(2)}`;
         }
 
         document.getElementById('seccionNuevo').classList.remove('visible');
-        mostrarTarifa(v.idTipo);
+        mostrarTarifa(v.id_tipo);
         document.getElementById('btnSiguiente').disabled = false;
 
       } else if (res.status === 404) {
@@ -459,8 +459,8 @@
     }
   }
 
-  function mostrarTarifa(idTipo) {
-    const tipo = tiposVehiculo.find(t => t.idTipo === idTipo);
+  function mostrarTarifa(id_tipo) {
+    const tipo = tiposVehiculo.find(t => t.id_tipo === id_tipo);
     if (!tipo) return;
     document.getElementById('tarifaPreview').classList.add('visible');
     document.getElementById('tarifaTipo').textContent = tipo.nombre;
@@ -491,28 +491,28 @@
 
     // Si es nuevo: registrar vehículo primero
     if (esNuevo) {
-      const idTipo = parseInt(document.getElementById('selTipo').value);
+      const id_tipo = parseInt(document.getElementById('selTipo').value);
       const placa  = document.getElementById('inputPlaca').value.trim().toUpperCase();
-      const marcaModelo = document.getElementById('inputMarcaModelo').value.trim() || null;
+      const marca_modelo = document.getElementById('inputMarcaModelo').value.trim() || null;
       const color  = document.getElementById('inputColor').value.trim() || null;
-      const propNombre  = document.getElementById('inputPropNombre').value.trim();
+      const prop_nombre  = document.getElementById('inputPropNombre').value.trim();
       const propCelular = document.getElementById('inputPropCelular').value.trim();
       const frecuente   = document.getElementById('chkFrecuente').checked;
 
       try {
         // Crear propietario si tiene nombre
-        let idProp = null;
-        if (propNombre) {
+        let id_prop = null;
+        if (prop_nombre) {
           const rp = await fetch(`${API}/propietarios`, {
             method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ nombre: propNombre, numCelular: propCelular || null })
+            body: JSON.stringify({ nombre: prop_nombre, num_celular: propCelular || null })
           });
-          if (rp.ok) { const p = await rp.json(); idProp = p.idProp; }
+          if (rp.ok) { const p = await rp.json(); id_prop = p.id_prop; }
         }
 
         const rv = await fetch(`${API}/vehiculos`, {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ placa, idTipo, marcaModelo, color, idProp, esFrecuente: frecuente })
+          body: JSON.stringify({ placa, id_tipo, marca_modelo, color, id_prop, es_frecuente: frecuente })
         });
         if (!rv.ok) {
           const e = await rv.json();
@@ -529,15 +529,15 @@
     // Mostrar resumen
     const v = vehiculoEncontrado;
     const turno = document.getElementById('selTurno').value;
-    const tipo = tiposVehiculo.find(t => t.idTipo === v.idTipo);
+    const tipo = tiposVehiculo.find(t => t.id_tipo === v.id_tipo);
 
     document.getElementById('resumenGrid').innerHTML = [
       ['Placa',    `<strong>${v.placa}</strong>`],
-      ['Tipo',     v.tipoNombre ?? tipo?.nombre ?? '—'],
+      ['Tipo',     v.tipo_nombre ?? tipo?.nombre ?? '—'],
       ['Turno',    turno],
       ['Precio',   `<strong style="color:var(--amarillo)">S/${(tipo?.tarifa ?? 0).toFixed(2)}</strong>`],
-      ['Descripción', v.marcaModelo ?? '—'],
-      ['Deuda actual', `S/${(v.deudaTotal ?? 0).toFixed(2)}`],
+      ['Descripción', v.marca_modelo ?? '—'],
+      ['Deuda actual', `S/${(v.deuda_total ?? 0).toFixed(2)}`],
     ].map(([k,val]) => `
       <div>
         <div style="font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--suave);margin-bottom:.2rem">${k}</div>
@@ -578,7 +578,7 @@
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
           placa: vehiculoEncontrado.placa,
-          fecha, tipoBloque: turno, responsablePago: responsable
+          fecha, tipo_bloque: turno, responsable_pago: responsable
         })
       });
 
@@ -590,7 +590,7 @@
       }
 
       const bloque = await res.json();
-      const tipo = tiposVehiculo.find(t => t.idTipo === vehiculoEncontrado.idTipo);
+      const tipo = tiposVehiculo.find(t => t.id_tipo === vehiculoEncontrado.id_tipo);
 
       // Mostrar éxito
       document.getElementById('step2').classList.remove('activo');
@@ -601,7 +601,7 @@
         Placa: <strong>${vehiculoEncontrado.placa}</strong><br>
         Turno: <strong>${turno}</strong> · Fecha: <strong>${fecha}</strong><br>
         Monto: <strong style="color:var(--amarillo)">S/${bloque.precio.toFixed(2)}</strong><br>
-        Bloque #${bloque.idBloque} generado en estado <strong>pendiente</strong>.
+        Bloque #${bloque.id_bloque} generado en estado <strong>pendiente</strong>.
       `;
       document.getElementById('successOverlay').classList.add('visible');
 

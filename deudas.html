@@ -391,7 +391,7 @@
 
   function renderTabla() {
     const filtrados = filtroActual === 'todos' ? deudas : deudas.filter(d => d.alerta === filtroActual);
-    const totalDeuda = filtrados.reduce((s, d) => s + d.deudaTotal, 0);
+    const totalDeuda = filtrados.reduce((s, d) => s + d.deuda_total, 0);
 
     document.getElementById('contadorFila').textContent = `${filtrados.length} vehículo${filtrados.length !== 1 ? 's' : ''}`;
     document.getElementById('totalDeuda').textContent = `S/${totalDeuda.toFixed(2)}`;
@@ -403,7 +403,7 @@
     }
 
     document.getElementById('tablaBody').innerHTML = filtrados.map(d => {
-      const pct = Math.min((d.deudaTotal / d.limiteDeuda) * 100, 100);
+      const pct = Math.min((d.deuda_total / d.limite_deuda) * 100, 100);
       const colorClase = d.alerta === 'rojo' ? 'deuda-rojo' : d.alerta === 'naranja' ? 'deuda-naranja' : 'deuda-normal';
       const badgeHtml = d.alerta === 'rojo'
         ? '<span class="badge badge-rojo">⚠ Alta</span>'
@@ -422,15 +422,15 @@
       return `<tr>
         <td><span class="placa">${d.placa}</span></td>
         <td>
-          <div>${d.tipoNombre ?? '—'}</div>
-          <div style="font-size:.68rem;color:var(--suave);margin-top:.15rem">${d.propNombre ?? '—'}${d.numCelular ? ' · ' + d.numCelular : ''}</div>
+          <div>${d.tipo_nombre ?? '—'}</div>
+          <div style="font-size:.68rem;color:var(--suave);margin-top:.15rem">${d.prop_nombre ?? '—'}${d.num_celular ? ' · ' + d.num_celular : ''}</div>
         </td>
         <td>
-          <div class="deuda-monto ${colorClase}">S/${d.deudaTotal.toFixed(2)}</div>
+          <div class="deuda-monto ${colorClase}">S/${d.deuda_total.toFixed(2)}</div>
           <div class="barra-deuda"><div class="barra-fill barra-${d.alerta === 'normal' ? 'verde' : d.alerta}" style="width:${pct}%"></div></div>
         </td>
-        <td style="color:var(--suave)">S/${d.limiteDeuda.toFixed(2)}</td>
-        <td style="color:var(--suave)">${d.bloquesPendientes}</td>
+        <td style="color:var(--suave)">S/${d.limite_deuda.toFixed(2)}</td>
+        <td style="color:var(--suave)">${d.bloques_pendientes}</td>
         <td>${badgeHtml}</td>
         ${acciones}
       </tr>`;
@@ -454,25 +454,25 @@
       const bloques = await resB.json();
 
       const deudaObj = deudas.find(d => d.placa === placa) ?? {};
-      const deuda = deudaObj.deudaTotal ?? 0;
+      const deuda = deudaObj.deuda_total ?? 0;
       const alerta = deudaObj.alerta ?? 'normal';
       const colorDeuda = alerta === 'rojo' ? 'var(--rojo)' : alerta === 'naranja' ? 'var(--naranja)' : 'var(--verde)';
 
       document.getElementById('drawerBody').innerHTML = `
         <div class="info-grid">
           <div><div class="info-item-label">Placa</div><div class="info-item-val" style="font-family:'Syne',sans-serif;font-weight:800">${v.placa}</div></div>
-          <div><div class="info-item-label">Tipo</div><div class="info-item-val">${v.tipoNombre ?? '—'}</div></div>
-          <div><div class="info-item-label">Propietario</div><div class="info-item-val">${v.propNombre ?? '—'}</div></div>
-          <div><div class="info-item-label">Celular</div><div class="info-item-val">${deudaObj.numCelular ?? '—'}</div></div>
-          <div><div class="info-item-label">Descripción</div><div class="info-item-val">${v.marcaModelo ?? '—'}</div></div>
-          <div><div class="info-item-label">Frecuente</div><div class="info-item-val">${v.esFrecuente ? 'Sí' : 'No'}</div></div>
+          <div><div class="info-item-label">Tipo</div><div class="info-item-val">${v.tipo_nombre ?? '—'}</div></div>
+          <div><div class="info-item-label">Propietario</div><div class="info-item-val">${v.prop_nombre ?? '—'}</div></div>
+          <div><div class="info-item-label">Celular</div><div class="info-item-val">${deudaObj.num_celular ?? '—'}</div></div>
+          <div><div class="info-item-label">Descripción</div><div class="info-item-val">${v.marca_modelo ?? '—'}</div></div>
+          <div><div class="info-item-label">Frecuente</div><div class="info-item-val">${v.es_frecuente ? 'Sí' : 'No'}</div></div>
         </div>
 
         <div style="background:var(--plomo);border:1px solid var(--borde);border-radius:2px;padding:1rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between">
           <div>
             <div style="font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--suave);margin-bottom:.3rem">Deuda total</div>
             <div style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:${colorDeuda}">S/${deuda.toFixed(2)}</div>
-            <div style="font-size:.68rem;color:var(--suave);margin-top:.2rem">Límite: S/${v.limiteDeuda.toFixed(2)}</div>
+            <div style="font-size:.68rem;color:var(--suave);margin-top:.2rem">Límite: S/${v.limite_deuda.toFixed(2)}</div>
           </div>
           <div style="text-align:right">
             <div style="font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--suave);margin-bottom:.3rem">Bloques pendientes</div>
@@ -485,8 +485,8 @@
           ${bloques.length ? bloques.map(b => `
             <div class="bloque-row">
               <div>
-                <div>Bloque #${b.idBloque} — Turno ${b.tipoBloque}</div>
-                <div class="bloque-row-info">${b.fecha}${b.responsablePago ? ' · ' + b.responsablePago : ''}</div>
+                <div>Bloque #${b.id_bloque} — Turno ${b.tipo_bloque}</div>
+                <div class="bloque-row-info">${b.fecha}${b.responsable_pago ? ' · ' + b.responsable_pago : ''}</div>
               </div>
               <div style="font-family:'Syne',sans-serif;font-weight:700">S/${b.precio.toFixed(2)}</div>
             </div>`).join('') : '<div style="color:var(--suave);font-size:.8rem;padding:.5rem 0">Sin bloques pendientes.</div>'}
@@ -494,8 +494,8 @@
 
         ${!soloLectura ? `<div class="nota-campo">
           <div class="nota-label">Nota del operador</div>
-          <div class="nota-actual ${bloques[0]?.responsablePago ? '' : 'vacia'}" id="notaActual">
-            ${bloques[0]?.responsablePago ?? 'Sin notas registradas.'}
+          <div class="nota-actual ${bloques[0]?.responsable_pago ? '' : 'vacia'}" id="notaActual">
+            ${bloques[0]?.responsable_pago ?? 'Sin notas registradas.'}
           </div>
           <input type="text" id="inputNota" placeholder="Agregar nota (chofer, propietario, acuerdo...)"
             style="width:100%;background:var(--plomo);border:1px solid var(--borde);border-radius:2px;padding:.6rem .85rem;font-family:'DM Mono',monospace;font-size:.8rem;color:var(--texto);outline:none;margin-top:.5rem"
@@ -522,7 +522,7 @@
   async function guardarNota(placa) {
     const nota = document.getElementById('inputNota')?.value?.trim();
     if (!nota) return;
-    // La nota se guarda como responsablePago en el bloque más reciente pendiente
+    // La nota se guarda como responsable_pago en el bloque más reciente pendiente
     // En este MVP se muestra pero no persiste sin un endpoint dedicado
     document.getElementById('notaActual').textContent = nota;
     document.getElementById('notaActual').classList.remove('vacia');

@@ -467,12 +467,12 @@
         <tr>
           <td style="color:var(--suave)">${i + 1}</td>
           <td><span class="placa">${p.placa}</span></td>
-          <td style="color:var(--suave)">${p.tipoNombre ?? '—'}</td>
+          <td style="color:var(--suave)">${p.tipo_nombre ?? '—'}</td>
           <td style="color:var(--suave)">—</td>
-          <td><span class="monto monto-verde">S/${p.montoTotal.toFixed(2)}</span></td>
-          <td><span class="badge badge-${p.metodoPago}">${p.metodoPago}</span></td>
+          <td><span class="monto monto-verde">S/${p.monto_total.toFixed(2)}</span></td>
+          <td><span class="badge badge-${p.metodo_pago}">${p.metodo_pago}</span></td>
           <td style="color:var(--suave)">${p.operador ?? '—'}</td>
-          <td style="color:var(--suave)">${formatHora(p.fechaPago)}</td>
+          <td style="color:var(--suave)">${formatHora(p.fecha_pago)}</td>
         </tr>`).join('');
 
       document.getElementById('subEfectivo').textContent = `S/${efectivo.toFixed(2)}`;
@@ -514,7 +514,7 @@
       const porDia = {};
       for (const d of detalle) {
         if (!porDia[d.dia]) porDia[d.dia] = { efectivo: 0, yape: 0 };
-        porDia[d.dia][d.metodoPago] = d.total;
+        porDia[d.dia][d.metodo_pago] = d.total;
       }
 
       if (!Object.keys(porDia).length) {
@@ -552,7 +552,7 @@
     try {
       const res = await fetch(`${API}/deudas`);
       deudasActuales = await res.json();
-      const totalDeuda = deudasActuales.reduce((s, d) => s + d.deudaTotal, 0);
+      const totalDeuda = deudasActuales.reduce((s, d) => s + d.deuda_total, 0);
       document.getElementById('mDeuda').textContent = `S/${totalDeuda.toFixed(2)}`;
 
       document.getElementById('panelDeudas').style.display = 'block';
@@ -566,10 +566,10 @@
       document.getElementById('bodyDeudas').innerHTML = deudasActuales.map(d => `
         <tr>
           <td><span class="placa">${d.placa}</span></td>
-          <td style="color:var(--suave)">${d.tipoNombre ?? '—'}</td>
-          <td style="color:var(--suave)">${d.propNombre ?? '—'}</td>
-          <td style="color:var(--suave)">${d.bloquesPendientes}</td>
-          <td><span class="monto monto-rojo">S/${d.deudaTotal.toFixed(2)}</span></td>
+          <td style="color:var(--suave)">${d.tipo_nombre ?? '—'}</td>
+          <td style="color:var(--suave)">${d.prop_nombre ?? '—'}</td>
+          <td style="color:var(--suave)">${d.bloques_pendientes}</td>
+          <td><span class="monto monto-rojo">S/${d.deuda_total.toFixed(2)}</span></td>
           <td><span class="badge badge-${d.alerta === 'rojo' ? 'rojo' : d.alerta === 'naranja' ? 'naranja' : 'efectivo'}">${d.alerta === 'rojo' ? '⚠ Alta' : d.alerta === 'naranja' ? '! Alerta' : 'Normal'}</span></td>
         </tr>`).join('');
     } catch (e) { console.error(e); }
@@ -587,7 +587,7 @@
       const pagos = datosActuales.pagos ?? [];
       csv  = 'Placa,Tipo,Monto,Metodo,Operador,Fecha\n';
       csv += pagos.map(p =>
-        `${p.placa},${p.tipoNombre ?? ''},${p.montoTotal.toFixed(2)},${p.metodoPago},${p.operador ?? ''},${p.fechaPago}`
+        `${p.placa},${p.tipo_nombre ?? ''},${p.monto_total.toFixed(2)},${p.metodo_pago},${p.operador ?? ''},${p.fecha_pago}`
       ).join('\n');
       csv += `\n\nEfectivo,S/${(datosActuales.subtotales?.efectivo ?? 0).toFixed(2)}`;
       csv += `\nYape,S/${(datosActuales.subtotales?.yape ?? 0).toFixed(2)}`;
@@ -596,13 +596,13 @@
       if (deudasActuales.length) {
         csv += '\n\nDeudas activas\nPlaca,Tipo,Propietario,Bloques pend.,Deuda total\n';
         csv += deudasActuales.map(d =>
-          `${d.placa},${d.tipoNombre ?? ''},${d.propNombre ?? ''},${d.bloquesPendientes},${d.deudaTotal.toFixed(2)}`
+          `${d.placa},${d.tipo_nombre ?? ''},${d.prop_nombre ?? ''},${d.bloques_pendientes},${d.deuda_total.toFixed(2)}`
         ).join('\n');
       }
     } else {
       const detalle = datosActuales.detalleDiario ?? [];
       csv  = 'Fecha,Metodo,Total\n';
-      csv += detalle.map(d => `${d.dia},${d.metodoPago},${d.total.toFixed(2)}`).join('\n');
+      csv += detalle.map(d => `${d.dia},${d.metodo_pago},${d.total.toFixed(2)}`).join('\n');
       csv += `\n\nTotal efectivo,S/${datosActuales.totalEfectivo?.toFixed(2)}`;
       csv += `\nTotal Yape,S/${datosActuales.totalYape?.toFixed(2)}`;
       csv += `\nGran total,S/${datosActuales.granTotal?.toFixed(2)}`;
