@@ -439,11 +439,17 @@ def dashboard():
 
 
 # ══ REPORTES ══════════════════════════════════════════════════
+def _turno_de(hora_expr: str) -> str:
+    """Expresión SQL: turno DIA/NOCHE según la hora del pago (no del bloque)."""
+    return f"(CASE WHEN EXTRACT(HOUR FROM {hora_expr}) >= 18 OR EXTRACT(HOUR FROM {hora_expr}) < 8 THEN 'NOCHE' ELSE 'DIA' END)"
+
 @app.get("/reportes/turno", tags=["Reportes"])
 def reporte_turno(fecha: date = Query(...), turno: str = Query(...)):
+    turno_expr = _turno_de("P.fecha_pago")
     with db_session() as (cur, con):
-        cur.execute("""
-            SELECT B.placa, V.marca_modelo, T.nombre AS tipo_nombre,
+        cur.execute(f"""
+            SELECT DISTINCT ON (P.id_pago)
+                   P.id_pago, B.placa, V.marca_modelo, T.nombre AS tipo_nombre,
                    P.monto_total, P.metodo_pago, U.nombre AS operador,
                    P.fecha_pago, P.observacion
             FROM pago P
@@ -452,19 +458,19 @@ def reporte_turno(fecha: date = Query(...), turno: str = Query(...)):
             JOIN vehiculo V ON B.placa=V.placa
             JOIN tipo_vehiculo T ON V.id_tipo=T.id_tipo
             JOIN usuario U ON P.id_operador=U.id_usuario
-            WHERE B.fecha=%s AND B.tipo_bloque=%s
-            GROUP BY P.id_pago,B.placa,V.marca_modelo,T.nombre,P.monto_total,P.metodo_pago,U.nombre,P.fecha_pago,P.observacion
-            ORDER BY P.fecha_pago
+            WHERE P.fecha_pago::date = %s AND {turno_expr} = %s
+            ORDER BY P.id_pago, P.fecha_pago
         """, (fecha.isoformat(), turno))
         pagos = cur.fetchall()
-        cur.execute("""
+        cur.execute(f"""
             SELECT P.metodo_pago, COALESCE(SUM(P.monto_total),0) AS total
-            FROM pago P JOIN pago_bloque PB ON P.id_pago=PB.id_pago
-            JOIN bloque B ON PB.id_bloque=B.id_bloque
-            WHERE B.fecha=%s AND B.tipo_bloque=%s GROUP BY P.metodo_pago
+            FROM pago P
+            WHERE P.fecha_pago::date = %s AND {turno_expr} = %s
+            GROUP BY P.metodo_pago
         """, (fecha.isoformat(), turno))
         subtotales = cur.fetchall()
-    return {"fecha": fecha.isoformat(), "turno": turno, "pagos": [dict(r) for r in pagos], "subtotales": {r["metodo_pago"]: r["total"] for r in subtotales}}
+    pagos_ordenados = sorted([dict(r) for r in pagos], key=lambda r: r["fecha_pago"])
+    return {"fecha": fecha.isoformat(), "turno": turno, "pagos": pagos_ordenados, "subtotales": {r["metodo_pago"]: r["total"] for r in subtotales}}
 
 @app.get("/reportes/semanal", tags=["Reportes"])
 def reporte_semanal(fecha_ini: date = Query(...), fecha_fin: date = Query(...)):
