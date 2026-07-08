@@ -1,5 +1,5 @@
 """
-schemas.py — Modelos Pydantic para request / response
+schemas.py — Modelos Pydantic para request/response (PostgreSQL snake_case)
 """
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -8,7 +8,7 @@ from datetime import date, datetime
 
 # ── TIPO_VEHICULO ─────────────────────────────────────────────
 class TipoVehiculoOut(BaseModel):
-    idTipo: int
+    id_tipo: int
     nombre: str
     tarifa: float
 
@@ -16,65 +16,71 @@ class TipoVehiculoOut(BaseModel):
 # ── PROPIETARIO ───────────────────────────────────────────────
 class PropietarioIn(BaseModel):
     nombre: str
-    numCelular: Optional[str] = None
+    num_celular: Optional[str] = None
     email: Optional[str] = None
     direccion: Optional[str] = None
 
 class PropietarioOut(PropietarioIn):
-    idProp: int
+    id_prop: int
 
 
 # ── VEHICULO ──────────────────────────────────────────────────
 class VehiculoIn(BaseModel):
-    placa: str = Field(..., min_length=5, max_length=10)
-    idTipo: int
-    marcaModelo: Optional[str] = None
+    placa: str
+    id_tipo: int
+    marca_modelo: Optional[str] = None
     color: Optional[str] = None
-    idProp: Optional[int] = None
-    limiteDeuda: float = 100.0
-    esFrecuente: bool = False
+    id_prop: Optional[int] = None
+    limite_deuda: float = 100.0
+    es_frecuente: bool = False
 
-class VehiculoOut(VehiculoIn):
-    tipoNombre: Optional[str] = None
-    propNombre: Optional[str] = None
-    deudaTotal: float = 0.0
+class VehiculoOut(BaseModel):
+    placa: str
+    id_tipo: int
+    marca_modelo: Optional[str] = None
+    color: Optional[str] = None
+    id_prop: Optional[int] = None
+    limite_deuda: float
+    es_frecuente: bool
+    tipo_nombre: Optional[str] = None
+    prop_nombre: Optional[str] = None
+    deuda_total: float = 0.0
 
 
 # ── BLOQUE ────────────────────────────────────────────────────
 class BloqueIn(BaseModel):
     placa: str
     fecha: date
-    tipoBloque: str = Field(..., pattern="^(DIA|NOCHE)$")
-    responsablePago: Optional[str] = None
-    # precio se calcula automáticamente desde TIPO_VEHICULO
+    tipo_bloque: str
+    responsable_pago: Optional[str] = None
 
 class BloqueOut(BaseModel):
-    idBloque: int
+    id_bloque: int
     placa: str
     fecha: date
-    tipoBloque: str
+    tipo_bloque: str
     precio: float
     estado: str
-    responsablePago: Optional[str]
-    creadoEn: datetime
-    tipoNombre: Optional[str] = None
+    responsable_pago: Optional[str] = None
+    creado_en: datetime
+    tipo_nombre: Optional[str] = None
 
 
 # ── PAGO ──────────────────────────────────────────────────────
 class PagoIn(BaseModel):
-    idsBloques: List[int]
-    metodoPago: str = Field(..., pattern="^(efectivo|yape)$")
-    idOperador: int
+    ids_bloques: List[int]
+    metodo_pago: str
+    id_operador: int
     observacion: Optional[str] = None
 
 class PagoOut(BaseModel):
-    idPago: int
-    fechaPago: datetime
-    montoTotal: float
-    metodoPago: str
-    idOperador: int
-    observacion: Optional[str]
-    bloquesCubiertos: List[int] = []
+    id_pago: int
+    fecha_pago: datetime
+    monto_total: float
+    metodo_pago: str
+    id_operador: int
+    observacion: Optional[str] = None
+    bloques_cubiertos: List[int] = []
 
 
 # ── USUARIO / AUTH ────────────────────────────────────────────
@@ -91,7 +97,7 @@ class UsuarioOut(BaseModel):
 
 # ── DASHBOARD ─────────────────────────────────────────────────
 class DashboardOut(BaseModel):
-    vehiculosPresentes: int
-    ingresosTurno: float
-    deudaTotal: float
-    bloquesPendientes: int
+    vehiculos_presentes: int
+    ingresos_turno: float
+    deuda_total: float
+    bloques_pendientes: int
