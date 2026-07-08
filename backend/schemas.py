@@ -83,7 +83,7 @@ class LoginIn(BaseModel):
     password: str
 
 class UsuarioOut(BaseModel):
-    idUsuario: int
+    id_Usuario: int
     nombre: str
     username: str
     rol: str
