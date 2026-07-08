@@ -32,25 +32,25 @@ async def lifespan(app: FastAPI):
     with db_session() as (cur, con):
         cur.execute("""
             CREATE TABLE IF NOT EXISTS TIPO_VEHICULO (
-                idTipo   SERIAL PRIMARY KEY,
+                id_tipo   SERIAL PRIMARY KEY,
                 nombre   VARCHAR(50) NOT NULL UNIQUE,
                 tarifa   NUMERIC(6,2) NOT NULL CHECK(tarifa >= 0)
             );
         """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS USUARIO (
-                idUsuario    SERIAL PRIMARY KEY,
+                id_usuario    SERIAL PRIMARY KEY,
                 nombre       VARCHAR(100) NOT NULL,
                 username     VARCHAR(50) NOT NULL UNIQUE,
-                passwordHash VARCHAR(256) NOT NULL,
+                password_hash VARCHAR(256) NOT NULL,
                 rol          VARCHAR(20) NOT NULL CHECK(rol IN ('operador','presidenta'))
             );
         """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS PROPIETARIO (
-                idProp    SERIAL PRIMARY KEY,
+                id_prop    SERIAL PRIMARY KEY,
                 nombre    VARCHAR(100) NOT NULL,
-                numCelular VARCHAR(20),
+                num_celular VARCHAR(20),
                 email     VARCHAR(100),
                 direccion VARCHAR(200)
             );
@@ -58,42 +58,42 @@ async def lifespan(app: FastAPI):
         cur.execute("""
             CREATE TABLE IF NOT EXISTS VEHICULO (
                 placa        VARCHAR(10) PRIMARY KEY,
-                idTipo       INTEGER NOT NULL REFERENCES TIPO_VEHICULO(idTipo),
-                marcaModelo  VARCHAR(100),
+                id_tipo       INTEGER NOT NULL REFERENCES TIPO_VEHICULO(id_tipo),
+                marca_modelo  VARCHAR(100),
                 color        VARCHAR(30),
-                idProp       INTEGER REFERENCES PROPIETARIO(idProp),
-                limiteDeuda  NUMERIC(8,2) NOT NULL DEFAULT 100.0 CHECK(limiteDeuda >= 0),
-                esFrecuente  BOOLEAN NOT NULL DEFAULT FALSE
+                id_prop       INTEGER REFERENCES PROPIETARIO(id_prop),
+                limite_deuda  NUMERIC(8,2) NOT NULL DEFAULT 100.0 CHECK(limite_deuda >= 0),
+                es_frecuente  BOOLEAN NOT NULL DEFAULT FALSE
             );
         """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS BLOQUE (
-                idBloque        SERIAL PRIMARY KEY,
+                id_bloque        SERIAL PRIMARY KEY,
                 placa           VARCHAR(10) NOT NULL REFERENCES VEHICULO(placa),
                 fecha           DATE NOT NULL,
-                tipoBloque      VARCHAR(6) NOT NULL CHECK(tipoBloque IN ('DIA','NOCHE')),
+                tipo_bloque      VARCHAR(6) NOT NULL CHECK(tipo_bloque IN ('DIA','NOCHE')),
                 precio          NUMERIC(6,2) NOT NULL CHECK(precio >= 0),
                 estado          VARCHAR(10) NOT NULL DEFAULT 'pendiente'
                                 CHECK(estado IN ('pendiente','pagado','anulado')),
-                responsablePago VARCHAR(100),
-                creadoEn        TIMESTAMP NOT NULL DEFAULT NOW()
+                responsable_pago VARCHAR(100),
+                creado_en        TIMESTAMP NOT NULL DEFAULT NOW()
             );
         """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS PAGO (
-                idPago      SERIAL PRIMARY KEY,
-                fechaPago   TIMESTAMP NOT NULL DEFAULT NOW(),
-                montoTotal  NUMERIC(8,2) NOT NULL CHECK(montoTotal >= 0),
-                metodoPago  VARCHAR(10) NOT NULL CHECK(metodoPago IN ('efectivo','yape')),
-                idOperador  INTEGER NOT NULL REFERENCES USUARIO(idUsuario),
+                id_pago      SERIAL PRIMARY KEY,
+                fecha_pago   TIMESTAMP NOT NULL DEFAULT NOW(),
+                monto_total  NUMERIC(8,2) NOT NULL CHECK(monto_total >= 0),
+                metodo_pago  VARCHAR(10) NOT NULL CHECK(metodo_pago IN ('efectivo','yape')),
+                id_operador  INTEGER NOT NULL REFERENCES USUARIO(id_usuario),
                 observacion VARCHAR(300)
             );
         """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS PAGO_BLOQUE (
-                idPago   INTEGER NOT NULL REFERENCES PAGO(idPago),
-                idBloque INTEGER NOT NULL REFERENCES BLOQUE(idBloque),
-                PRIMARY KEY (idPago, idBloque)
+                id_pago   INTEGER NOT NULL REFERENCES PAGO(id_pago),
+                id_bloque INTEGER NOT NULL REFERENCES BLOQUE(id_bloque),
+                PRIMARY KEY (id_pago, id_bloque)
             );
         """)
 
@@ -115,7 +115,7 @@ async def lifespan(app: FastAPI):
         if list(row.values())[0] == 0:
             def sha256(t): return hashlib.sha256(t.encode()).hexdigest()
             cur.execute("""
-                INSERT INTO USUARIO (nombre, username, passwordHash, rol) VALUES
+                INSERT INTO USUARIO (nombre, username, password_hash, rol) VALUES
                 (%s, %s, %s, %s), (%s, %s, %s, %s)
                 ON CONFLICT (username) DO NOTHING
             """, (
@@ -152,7 +152,7 @@ def _sha256(text: str) -> str:
 def login(body: LoginIn):
     with db_session() as (cur, con):
         cur.execute(
-            "SELECT * FROM USUARIO WHERE username = %s AND passwordHash = %s",
+            "SELECT * FROM USUARIO WHERE username = %s AND password_hash = %s",
             (body.username, _sha256(body.password))
         )
         row = cur.fetchone()
@@ -181,8 +181,8 @@ def listar_tipos():
 def crear_propietario(body: PropietarioIn):
     with db_session() as (cur, con):
         cur.execute(
-            "INSERT INTO PROPIETARIO (nombre, numCelular, email, direccion) VALUES (%s,%s,%s,%s) RETURNING *",
-            (body.nombre, body.numCelular, body.email, body.direccion)
+            "INSERT INTO PROPIETARIO (nombre, num_celular, email, direccion) VALUES (%s,%s,%s,%s) RETURNING *",
+            (body.nombre, body.num_celular, body.email, body.direccion)
         )
         row = cur.fetchone()
     return dict(row)
@@ -193,7 +193,7 @@ def buscar_propietarios(q: Optional[str] = Query(None)):
     sql = "SELECT * FROM PROPIETARIO"
     params: list = []
     if q:
-        sql += " WHERE nombre ILIKE %s OR numCelular ILIKE %s"
+        sql += " WHERE nombre ILIKE %s OR num_celular ILIKE %s"
         params = [f"%{q}%", f"%{q}%"]
     with db_session() as (cur, con):
         cur.execute(sql, params)
@@ -211,14 +211,14 @@ def registrar_vehiculo(body: VehiculoIn):
         cur.execute("SELECT placa FROM VEHICULO WHERE placa=%s", (body.placa,))
         if cur.fetchone():
             raise HTTPException(400, f"La placa {body.placa} ya está registrada.")
-        cur.execute("SELECT idTipo FROM TIPO_VEHICULO WHERE idTipo=%s", (body.idTipo,))
+        cur.execute("SELECT id_tipo FROM TIPO_VEHICULO WHERE id_tipo=%s", (body.id_tipo,))
         if not cur.fetchone():
             raise HTTPException(404, "Tipo de vehículo no encontrado.")
         cur.execute(
-            """INSERT INTO VEHICULO (placa, idTipo, marcaModelo, color, idProp, limiteDeuda, esFrecuente)
+            """INSERT INTO VEHICULO (placa, id_tipo, marca_modelo, color, id_prop, limite_deuda, es_frecuente)
                VALUES (%s,%s,%s,%s,%s,%s,%s)""",
-            (body.placa, body.idTipo, body.marcaModelo, body.color,
-             body.idProp, body.limiteDeuda, body.esFrecuente)
+            (body.placa, body.id_tipo, body.marca_modelo, body.color,
+             body.id_prop, body.limite_deuda, body.es_frecuente)
         )
     return _get_vehiculo(body.placa)
 
@@ -235,8 +235,8 @@ def buscar_vehiculos(q: Optional[str] = Query(None)):
                COALESCE((SELECT SUM(precio) FROM BLOQUE
                          WHERE placa=V.placa AND estado='pendiente'), 0) AS deudaTotal
         FROM VEHICULO V
-        JOIN TIPO_VEHICULO T ON V.idTipo=T.idTipo
-        LEFT JOIN PROPIETARIO P ON V.idProp=P.idProp
+        JOIN TIPO_VEHICULO T ON V.id_tipo=T.id_tipo
+        LEFT JOIN PROPIETARIO P ON V.id_prop=P.id_prop
     """
     params: list = []
     if q:
@@ -255,8 +255,8 @@ def _get_vehiculo(placa: str) -> dict:
                    COALESCE((SELECT SUM(precio) FROM BLOQUE
                              WHERE placa=V.placa AND estado='pendiente'), 0) AS deudaTotal
             FROM VEHICULO V
-            JOIN TIPO_VEHICULO T ON V.idTipo=T.idTipo
-            LEFT JOIN PROPIETARIO P ON V.idProp=P.idProp
+            JOIN TIPO_VEHICULO T ON V.id_tipo=T.id_tipo
+            LEFT JOIN PROPIETARIO P ON V.id_prop=P.id_prop
             WHERE V.placa=%s
         """, (placa,))
         row = cur.fetchone()
@@ -273,7 +273,7 @@ def _get_vehiculo(placa: str) -> dict:
 def crear_bloque(body: BloqueIn):
     with db_session() as (cur, con):
         cur.execute(
-            "SELECT V.placa, T.tarifa FROM VEHICULO V JOIN TIPO_VEHICULO T ON V.idTipo=T.idTipo WHERE V.placa=%s",
+            "SELECT V.placa, T.tarifa FROM VEHICULO V JOIN TIPO_VEHICULO T ON V.id_tipo=T.id_tipo WHERE V.placa=%s",
             (body.placa,)
         )
         veh = cur.fetchone()
@@ -287,15 +287,15 @@ def crear_bloque(body: BloqueIn):
             (body.placa,)
         )
         deuda = cur.fetchone()["total"]
-        cur.execute("SELECT limiteDeuda FROM VEHICULO WHERE placa=%s", (body.placa,))
-        limite = cur.fetchone()["limiteDeuda"]
+        cur.execute("SELECT limite_deuda FROM VEHICULO WHERE placa=%s", (body.placa,))
+        limite = cur.fetchone()["limite_deuda"]
         if deuda + precio > limite * 1.5:
             raise HTTPException(409, f"Deuda acumulada (S/{deuda:.2f}) supera el límite permitido (S/{limite:.2f}).")
 
         cur.execute(
-            """INSERT INTO BLOQUE (placa, fecha, tipoBloque, precio, estado, responsablePago)
-               VALUES (%s,%s,%s,%s,'pendiente',%s) RETURNING idBloque""",
-            (body.placa, body.fecha.isoformat(), body.tipoBloque, precio, body.responsablePago)
+            """INSERT INTO BLOQUE (placa, fecha, tipo_bloque, precio, estado, responsable_pago)
+               VALUES (%s,%s,%s,%s,'pendiente',%s) RETURNING id_bloque""",
+            (body.placa, body.fecha.isoformat(), body.tipo_bloque, precio, body.responsable_pago)
         )
         id_bloque = cur.fetchone()["idbloque"]
 
@@ -303,8 +303,8 @@ def crear_bloque(body: BloqueIn):
             SELECT B.*, T.nombre AS tipoNombre
             FROM BLOQUE B
             JOIN VEHICULO V ON B.placa=V.placa
-            JOIN TIPO_VEHICULO T ON V.idTipo=T.idTipo
-            WHERE B.idBloque=%s
+            JOIN TIPO_VEHICULO T ON V.id_tipo=T.id_tipo
+            WHERE B.id_bloque=%s
         """, (id_bloque,))
         row = cur.fetchone()
     return dict(row)
@@ -313,18 +313,18 @@ def crear_bloque(body: BloqueIn):
 @app.patch("/bloques/{id_bloque}/anular", response_model=BloqueOut, tags=["Bloques"])
 def anular_bloque(id_bloque: int):
     with db_session() as (cur, con):
-        cur.execute("SELECT * FROM BLOQUE WHERE idBloque=%s", (id_bloque,))
+        cur.execute("SELECT * FROM BLOQUE WHERE id_bloque=%s", (id_bloque,))
         bloque = cur.fetchone()
         if not bloque:
             raise HTTPException(404, "Bloque no encontrado.")
         if bloque["estado"] != "pendiente":
             raise HTTPException(400, f"Solo se puede anular un bloque 'pendiente' (estado actual: {bloque['estado']}).")
-        cur.execute("UPDATE BLOQUE SET estado='anulado' WHERE idBloque=%s", (id_bloque,))
+        cur.execute("UPDATE BLOQUE SET estado='anulado' WHERE id_bloque=%s", (id_bloque,))
         cur.execute("""
             SELECT B.*, T.nombre AS tipoNombre
             FROM BLOQUE B JOIN VEHICULO V ON B.placa=V.placa
-            JOIN TIPO_VEHICULO T ON V.idTipo=T.idTipo
-            WHERE B.idBloque=%s
+            JOIN TIPO_VEHICULO T ON V.id_tipo=T.id_tipo
+            WHERE B.id_bloque=%s
         """, (id_bloque,))
         row = cur.fetchone()
     return dict(row)
@@ -339,7 +339,7 @@ def listar_bloques(
     sql = """
         SELECT B.*, T.nombre AS tipoNombre
         FROM BLOQUE B JOIN VEHICULO V ON B.placa=V.placa
-        JOIN TIPO_VEHICULO T ON V.idTipo=T.idTipo
+        JOIN TIPO_VEHICULO T ON V.id_tipo=T.id_tipo
         WHERE 1=1
     """
     params: list = []
@@ -349,7 +349,7 @@ def listar_bloques(
         sql += " AND B.estado=%s"; params.append(estado)
     if fecha:
         sql += " AND B.fecha=%s"; params.append(fecha.isoformat())
-    sql += " ORDER BY B.creadoEn DESC"
+    sql += " ORDER BY B.creado_en DESC"
     with db_session() as (cur, con):
         cur.execute(sql, params)
         rows = cur.fetchall()
@@ -365,7 +365,7 @@ def registrar_pago(body: PagoIn):
     with db_session() as (cur, con):
         placeholders = ",".join(["%s"] * len(body.idsBloques))
         cur.execute(
-            f"SELECT * FROM BLOQUE WHERE idBloque IN ({placeholders})",
+            f"SELECT * FROM BLOQUE WHERE id_bloque IN ({placeholders})",
             body.idsBloques
         )
         bloques = cur.fetchall()
@@ -378,17 +378,17 @@ def registrar_pago(body: PagoIn):
         monto = sum(b["precio"] for b in bloques)
 
         cur.execute(
-            """INSERT INTO PAGO (montoTotal, metodoPago, idOperador, observacion)
-               VALUES (%s,%s,%s,%s) RETURNING idPago""",
-            (monto, body.metodoPago, body.idOperador, body.observacion)
+            """INSERT INTO PAGO (monto_total, metodo_pago, id_operador, observacion)
+               VALUES (%s,%s,%s,%s) RETURNING id_pago""",
+            (monto, body.metodo_pago, body.id_operador, body.observacion)
         )
         id_pago = cur.fetchone()["idpago"]
 
         for b in bloques:
-            cur.execute("INSERT INTO PAGO_BLOQUE (idPago, idBloque) VALUES (%s,%s)", (id_pago, b["idbloque"]))
-            cur.execute("UPDATE BLOQUE SET estado='pagado' WHERE idBloque=%s", (b["idbloque"],))
+            cur.execute("INSERT INTO PAGO_BLOQUE (id_pago, id_bloque) VALUES (%s,%s)", (id_pago, b["idbloque"]))
+            cur.execute("UPDATE BLOQUE SET estado='pagado' WHERE id_bloque=%s", (b["idbloque"],))
 
-        cur.execute("SELECT * FROM PAGO WHERE idPago=%s", (id_pago,))
+        cur.execute("SELECT * FROM PAGO WHERE id_pago=%s", (id_pago,))
         row = cur.fetchone()
     return {**dict(row), "bloquesCubiertos": body.idsBloques}
 
@@ -402,18 +402,18 @@ def listar_pagos(
     sql = "SELECT * FROM PAGO WHERE 1=1"
     params: list = []
     if fecha_ini:
-        sql += " AND fechaPago::date >= %s"; params.append(fecha_ini.isoformat())
+        sql += " AND fecha_pago::date >= %s"; params.append(fecha_ini.isoformat())
     if fecha_fin:
-        sql += " AND fechaPago::date <= %s"; params.append(fecha_fin.isoformat())
+        sql += " AND fecha_pago::date <= %s"; params.append(fecha_fin.isoformat())
     if metodo:
-        sql += " AND metodoPago=%s"; params.append(metodo)
-    sql += " ORDER BY fechaPago DESC"
+        sql += " AND metodo_pago=%s"; params.append(metodo)
+    sql += " ORDER BY fecha_pago DESC"
     with db_session() as (cur, con):
         cur.execute(sql, params)
         pagos = cur.fetchall()
         result = []
         for p in pagos:
-            cur.execute("SELECT idBloque FROM PAGO_BLOQUE WHERE idPago=%s", (p["idpago"],))
+            cur.execute("SELECT id_bloque FROM PAGO_BLOQUE WHERE id_pago=%s", (p["idpago"],))
             bloques = cur.fetchall()
             result.append({**dict(p), "bloquesCubiertos": [b["idbloque"] for b in bloques]})
     return result
@@ -427,13 +427,13 @@ def listar_pagos(
 def libro_deudas(q: Optional[str] = Query(None)):
     sql = """
         SELECT
-            V.placa, V.limiteDeuda, V.esFrecuente,
-            T.nombre AS tipoNombre, P.nombre AS propNombre, P.numCelular,
+            V.placa, V.limite_deuda, V.es_frecuente,
+            T.nombre AS tipoNombre, P.nombre AS propNombre, P.num_celular,
             COALESCE(SUM(CASE WHEN B.estado='pendiente' THEN B.precio ELSE 0 END), 0) AS deudaTotal,
             COUNT(CASE WHEN B.estado='pendiente' THEN 1 END) AS bloquesPendientes
         FROM VEHICULO V
-        JOIN TIPO_VEHICULO T ON V.idTipo=T.idTipo
-        LEFT JOIN PROPIETARIO P ON V.idProp=P.idProp
+        JOIN TIPO_VEHICULO T ON V.id_tipo=T.id_tipo
+        LEFT JOIN PROPIETARIO P ON V.id_prop=P.id_prop
         LEFT JOIN BLOQUE B ON V.placa=B.placa
         WHERE 1=1
     """
@@ -441,7 +441,7 @@ def libro_deudas(q: Optional[str] = Query(None)):
     if q:
         sql += " AND (V.placa ILIKE %s OR P.nombre ILIKE %s)"
         params += [f"%{q}%", f"%{q}%"]
-    sql += " GROUP BY V.placa, V.limiteDeuda, V.esFrecuente, T.nombre, P.nombre, P.numCelular HAVING COALESCE(SUM(CASE WHEN B.estado='pendiente' THEN B.precio ELSE 0 END),0) > 0 ORDER BY deudaTotal DESC"
+    sql += " GROUP BY V.placa, V.limite_deuda, V.es_frecuente, T.nombre, P.nombre, P.num_celular HAVING COALESCE(SUM(CASE WHEN B.estado='pendiente' THEN B.precio ELSE 0 END),0) > 0 ORDER BY deudaTotal DESC"
 
     with db_session() as (cur, con):
         cur.execute(sql, params)
@@ -451,7 +451,7 @@ def libro_deudas(q: Optional[str] = Query(None)):
     for r in rows:
         d = dict(r)
         deuda = float(d["deudaTotal"])
-        limite = float(d["limiteDeuda"])
+        limite = float(d["limite_deuda"])
         d["alerta"] = "rojo" if deuda > limite else "naranja" if deuda > limite * 0.8 else "normal"
         result.append(d)
     return result
@@ -469,13 +469,13 @@ def dashboard():
 
     with db_session() as (cur, con):
         cur.execute(
-            "SELECT COUNT(DISTINCT placa) AS n FROM BLOQUE WHERE fecha=%s AND tipoBloque=%s AND estado='pendiente'",
+            "SELECT COUNT(DISTINCT placa) AS n FROM BLOQUE WHERE fecha=%s AND tipo_bloque=%s AND estado='pendiente'",
             (hoy, turno)
         )
         presentes = cur.fetchone()["n"]
 
         cur.execute(
-            "SELECT COALESCE(SUM(montoTotal),0) AS total FROM PAGO WHERE fechaPago::date=%s",
+            "SELECT COALESCE(SUM(monto_total),0) AS total FROM PAGO WHERE fecha_pago::date=%s",
             (hoy,)
         )
         ingresos = cur.fetchone()["total"]
@@ -505,29 +505,29 @@ def reporte_turno(
 ):
     with db_session() as (cur, con):
         cur.execute("""
-            SELECT B.placa, V.marcaModelo, T.nombre AS tipoNombre,
-                   P.montoTotal, P.metodoPago, U.nombre AS operador,
-                   P.fechaPago, P.observacion
+            SELECT B.placa, V.marca_modelo, T.nombre AS tipoNombre,
+                   P.monto_total, P.metodo_pago, U.nombre AS operador,
+                   P.fecha_pago, P.observacion
             FROM PAGO P
-            JOIN PAGO_BLOQUE PB ON P.idPago=PB.idPago
-            JOIN BLOQUE B ON PB.idBloque=B.idBloque
+            JOIN PAGO_BLOQUE PB ON P.id_pago=PB.id_pago
+            JOIN BLOQUE B ON PB.id_bloque=B.id_bloque
             JOIN VEHICULO V ON B.placa=V.placa
-            JOIN TIPO_VEHICULO T ON V.idTipo=T.idTipo
-            JOIN USUARIO U ON P.idOperador=U.idUsuario
-            WHERE B.fecha=%s AND B.tipoBloque=%s
-            GROUP BY P.idPago, B.placa, V.marcaModelo, T.nombre, P.montoTotal,
-                     P.metodoPago, U.nombre, P.fechaPago, P.observacion
-            ORDER BY P.fechaPago
+            JOIN TIPO_VEHICULO T ON V.id_tipo=T.id_tipo
+            JOIN USUARIO U ON P.id_operador=U.id_usuario
+            WHERE B.fecha=%s AND B.tipo_bloque=%s
+            GROUP BY P.id_pago, B.placa, V.marca_modelo, T.nombre, P.monto_total,
+                     P.metodo_pago, U.nombre, P.fecha_pago, P.observacion
+            ORDER BY P.fecha_pago
         """, (fecha.isoformat(), turno))
         pagos = cur.fetchall()
 
         cur.execute("""
-            SELECT P.metodoPago, COALESCE(SUM(P.montoTotal),0) AS total
+            SELECT P.metodo_pago, COALESCE(SUM(P.monto_total),0) AS total
             FROM PAGO P
-            JOIN PAGO_BLOQUE PB ON P.idPago=PB.idPago
-            JOIN BLOQUE B ON PB.idBloque=B.idBloque
-            WHERE B.fecha=%s AND B.tipoBloque=%s
-            GROUP BY P.metodoPago
+            JOIN PAGO_BLOQUE PB ON P.id_pago=PB.id_pago
+            JOIN BLOQUE B ON PB.id_bloque=B.id_bloque
+            WHERE B.fecha=%s AND B.tipo_bloque=%s
+            GROUP BY P.metodo_pago
         """, (fecha.isoformat(), turno))
         subtotales = cur.fetchall()
 
@@ -535,7 +535,7 @@ def reporte_turno(
         "fecha": fecha.isoformat(),
         "turno": turno,
         "pagos": [dict(r) for r in pagos],
-        "subtotales": {r["metodoPago"]: r["total"] for r in subtotales},
+        "subtotales": {r["metodo_pago"]: r["total"] for r in subtotales},
     }
 
 
@@ -546,16 +546,16 @@ def reporte_semanal(
 ):
     with db_session() as (cur, con):
         cur.execute("""
-            SELECT fechaPago::date AS dia, metodoPago, SUM(montoTotal) AS total
+            SELECT fecha_pago::date AS dia, metodo_pago, SUM(monto_total) AS total
             FROM PAGO
-            WHERE fechaPago::date BETWEEN %s AND %s
-            GROUP BY dia, metodoPago
+            WHERE fecha_pago::date BETWEEN %s AND %s
+            GROUP BY dia, metodo_pago
             ORDER BY dia
         """, (fecha_ini.isoformat(), fecha_fin.isoformat()))
         rows = cur.fetchall()
 
-    total_efectivo = sum(float(r["total"]) for r in rows if r["metodoPago"] == "efectivo")
-    total_yape     = sum(float(r["total"]) for r in rows if r["metodoPago"] == "yape")
+    total_efectivo = sum(float(r["total"]) for r in rows if r["metodo_pago"] == "efectivo")
+    total_yape     = sum(float(r["total"]) for r in rows if r["metodo_pago"] == "yape")
 
     return {
         "periodo": {"inicio": fecha_ini.isoformat(), "fin": fecha_fin.isoformat()},
