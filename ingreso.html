@@ -283,9 +283,9 @@
         <div class="busqueda-placa" id="wrapBusquedaPlaca">
           <div class="campo">
             <label>Placa del vehículo</label>
-            <input type="text" id="inputPlaca" placeholder="Ej: ABC-123"
+            <input type="text" id="inputPlaca" placeholder="Ej: CHE-482" maxlength="7"
               style="text-transform:uppercase; letter-spacing:.1em; font-size:1.1rem;"
-              oninput="this.value=this.value.toUpperCase(); validarPlacaActual()"
+              oninput="aplicarFormatoPlaca(this)"
               onkeydown="if(event.key==='Enter') buscarPlaca()">
           </div>
           <button class="btn btn-buscar" onclick="buscarPlaca()">Buscar</button>
@@ -311,7 +311,7 @@
 
           <div class="campo">
             <label>Tipo de vehículo</label>
-            <select id="selTipo" onchange="actualizarTarifa(); validarPlacaActual()">
+            <select id="selTipo" onchange="actualizarTarifa(); aplicarFormatoPlaca(document.getElementById('inputPlaca'))">
               <option value="">— Seleccionar —</option>
             </select>
           </div>
@@ -432,24 +432,46 @@
   let tiposVehiculo = [];
   let esNuevo = false;
 
-  // ── VALIDACIÓN DE PLACA ──────────────────────────────────────
-  // Perú: formato estándar (autos/otros) = 3 letras + 3 dígitos (ABC-123).
-  // Motos/mototaxis: el formato está en transición — se acepta el histórico
-  // (2 letras + 4 dígitos), el vigente desde 2024 (3 letras + 4 dígitos, DS 021-2024-MTC)
-  // y el numérico Mercosur (6-7 dígitos) habilitado desde 2026. Ajustar si el MTC cambia de nuevo.
-  function validarFormatoPlaca(placa, tipoNombre) {
-    const p = (placa || '').trim().toUpperCase().replace(/\s+/g, '');
-    if (!p) return false;
-    if ((tipoNombre || '').toLowerCase() === 'moto') {
-      return /^[A-Z]{1,3}-?\d{3,4}$/.test(p) || /^\d{6,7}$/.test(p);
+  // ── FORMATO Y VALIDACIÓN DE PLACA ────────────────────────────
+  // Autos y demás categorías: 3 letras + 3 dígitos, ej. CHE-482.
+  // Motos: 4 dígitos + 2 letras, ej. 5305-VA (formato real observado en Cochera Dunas).
+  // Siempre 6 caracteres alfanuméricos + guion, insertado automáticamente al escribir.
+  function esTipoMoto(tipoNombre) {
+    return (tipoNombre || '').toLowerCase() === 'moto';
+  }
+
+  function tipoNombreSeleccionado() {
+    const sel = document.getElementById('selTipo');
+    const opt = sel.options[sel.selectedIndex];
+    return opt ? opt.dataset.nombre : null;
+  }
+
+  function formatearPlaca(valor, tipoNombre) {
+    const limpio = (valor || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    // Si ya se eligió el tipo (registro de vehículo nuevo), usar ese.
+    // Si aún no se eligió (buscando un vehículo existente), inferir por el primer carácter:
+    // las placas de moto en Cochera Dunas empiezan con dígito (ej: 5305-VA), las demás con letra (ej: CHE-482).
+    const esMoto = tipoNombre ? esTipoMoto(tipoNombre) : /^[0-9]/.test(limpio);
+    const cortePos = esMoto ? 4 : 3;
+    if (limpio.length > cortePos) {
+      return limpio.slice(0, cortePos) + '-' + limpio.slice(cortePos);
     }
-    return /^[A-Z]{3}-?\d{3}$/.test(p);
+    return limpio;
+  }
+
+  function aplicarFormatoPlaca(input) {
+    input.value = formatearPlaca(input.value, tipoNombreSeleccionado());
+    validarPlacaActual();
+  }
+
+  function validarFormatoPlaca(placa, tipoNombre) {
+    const p = (placa || '').trim().toUpperCase();
+    if (!p) return false;
+    return esTipoMoto(tipoNombre) ? /^\d{4}-[A-Z]{2}$/.test(p) : /^[A-Z]{3}-\d{3}$/.test(p);
   }
 
   function validarPlacaActual() {
-    const sel = document.getElementById('selTipo');
-    const opt = sel.options[sel.selectedIndex];
-    const tipoNombre = opt ? opt.dataset.nombre : null;
+    const tipoNombre = tipoNombreSeleccionado();
     const placa = document.getElementById('inputPlaca').value;
     const err = document.getElementById('errorPlaca');
     const inputEl = document.getElementById('inputPlaca');
@@ -458,9 +480,9 @@
     err.classList.toggle('visible', !ok);
     inputEl.classList.toggle('invalido', !ok);
     if (!ok) {
-      err.textContent = tipoNombre.toLowerCase() === 'moto'
-        ? 'Formato de placa de moto no reconocido (ej: ABC-1234 o V1A-123).'
-        : 'Formato de placa no reconocido (ej: ABC-123).';
+      err.textContent = esTipoMoto(tipoNombre)
+        ? 'Formato de placa de moto incompleto (ej: 5305-VA).'
+        : 'Formato de placa incompleto (ej: CHE-482).';
     }
     return ok;
   }
