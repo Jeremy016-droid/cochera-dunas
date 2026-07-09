@@ -98,11 +98,3 @@ Abrir en el navegador: http://127.0.0.1:8000/docs
 
 ---
 
-## Próximos pasos (orden de desarrollo)
-
-- [ ] Paso 3 — Login con sesión (cookie o token JWT simple)
-- [ ] Paso 4 — Dashboard HTML
-- [ ] Paso 5 — Formularios de ingreso y pago
-- [ ] Paso 6 — Libro de deudas con alertas visuales
-- [ ] Paso 7 — Reportes + exportación PDF/Excel
-- [ ] Paso 8 — Migración a Supabase + deploy en Vercel
